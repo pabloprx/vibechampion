@@ -1,5 +1,11 @@
 {
   "name": "pabloprx-vibechampion",
+  "owner": "pabloprx",
   "description": "VibeBattle - Track and compare Claude Code usage with your team",
-  "plugins": ["plugins/vibechampion"]
+  "plugins": [
+    {
+      "name": "vibechampion",
+      "path": "plugins/vibechampion"
+    }
+  ]
 }
