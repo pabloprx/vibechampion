@@ -64,13 +64,13 @@ export interface DailyStats {
 
 export interface StatsPayload {
   date: string
-  inputTokens: number
-  outputTokens: number
-  cacheCreationTokens: number
-  cacheReadTokens: number
-  totalTokens: number
-  totalCost: number
-  modelsUsed: string[]
+  inputTokens?: number
+  outputTokens?: number
+  cacheCreationTokens?: number
+  cacheReadTokens?: number
+  totalTokens?: number
+  totalCost?: number
+  modelsUsed?: string[]
 }
 
 // User operations
@@ -132,13 +132,13 @@ export async function upsertDailyStats(userId: number, stats: StatsPayload): Pro
     args: [
       userId,
       stats.date,
-      stats.inputTokens,
-      stats.outputTokens,
-      stats.cacheCreationTokens,
-      stats.cacheReadTokens,
-      stats.totalTokens,
-      stats.totalCost,
-      JSON.stringify(stats.modelsUsed)
+      stats.inputTokens ?? 0,
+      stats.outputTokens ?? 0,
+      stats.cacheCreationTokens ?? 0,
+      stats.cacheReadTokens ?? 0,
+      stats.totalTokens ?? 0,
+      stats.totalCost ?? 0,
+      JSON.stringify(stats.modelsUsed ?? [])
     ]
   })
 }
