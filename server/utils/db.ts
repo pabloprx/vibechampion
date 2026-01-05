@@ -1,36 +1,46 @@
-import Database from 'better-sqlite3'
-import { join } from 'path'
+import { createClient, type Client } from '@libsql/client'
 
-const dbPath = join(process.cwd(), '.data', 'vibechampion.db')
-const db = new Database(dbPath)
+let db: Client | null = null
+
+function getDb(): Client {
+  if (!db) {
+    db = createClient({
+      url: process.env.TURSO_DATABASE_URL!,
+      authToken: process.env.TURSO_AUTH_TOKEN
+    })
+  }
+  return db
+}
 
 // Initialize tables
-db.exec(`
-  CREATE TABLE IF NOT EXISTS users (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    name TEXT UNIQUE NOT NULL,
-    created_at TEXT DEFAULT (datetime('now'))
-  );
+export async function initDb(): Promise<void> {
+  const client = getDb()
 
-  CREATE TABLE IF NOT EXISTS daily_stats (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    user_id INTEGER NOT NULL,
-    date TEXT NOT NULL,
-    input_tokens INTEGER DEFAULT 0,
-    output_tokens INTEGER DEFAULT 0,
-    cache_creation_tokens INTEGER DEFAULT 0,
-    cache_read_tokens INTEGER DEFAULT 0,
-    total_tokens INTEGER DEFAULT 0,
-    total_cost REAL DEFAULT 0,
-    models_used TEXT DEFAULT '[]',
-    submitted_at TEXT DEFAULT (datetime('now')),
-    FOREIGN KEY (user_id) REFERENCES users(id),
-    UNIQUE(user_id, date)
-  );
-
-  CREATE INDEX IF NOT EXISTS idx_daily_stats_date ON daily_stats(date);
-  CREATE INDEX IF NOT EXISTS idx_daily_stats_user_date ON daily_stats(user_id, date);
-`)
+  await client.batch([
+    `CREATE TABLE IF NOT EXISTS users (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      name TEXT UNIQUE NOT NULL,
+      created_at TEXT DEFAULT (datetime('now'))
+    )`,
+    `CREATE TABLE IF NOT EXISTS daily_stats (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      user_id INTEGER NOT NULL,
+      date TEXT NOT NULL,
+      input_tokens INTEGER DEFAULT 0,
+      output_tokens INTEGER DEFAULT 0,
+      cache_creation_tokens INTEGER DEFAULT 0,
+      cache_read_tokens INTEGER DEFAULT 0,
+      total_tokens INTEGER DEFAULT 0,
+      total_cost REAL DEFAULT 0,
+      models_used TEXT DEFAULT '[]',
+      submitted_at TEXT DEFAULT (datetime('now')),
+      FOREIGN KEY (user_id) REFERENCES users(id),
+      UNIQUE(user_id, date)
+    )`,
+    `CREATE INDEX IF NOT EXISTS idx_daily_stats_date ON daily_stats(date)`,
+    `CREATE INDEX IF NOT EXISTS idx_daily_stats_user_date ON daily_stats(user_id, date)`
+  ])
+}
 
 export interface User {
   id: number
@@ -64,57 +74,80 @@ export interface StatsPayload {
 }
 
 // User operations
-export function getOrCreateUser(name: string): User {
-  const existing = db.prepare('SELECT * FROM users WHERE name = ?').get(name) as User | undefined
-  if (existing) return existing
+export async function getOrCreateUser(name: string): Promise<User> {
+  const client = getDb()
+  const existing = await client.execute({
+    sql: 'SELECT * FROM users WHERE name = ?',
+    args: [name]
+  })
 
-  const result = db.prepare('INSERT INTO users (name) VALUES (?)').run(name)
-  return { id: result.lastInsertRowid as number, name, created_at: new Date().toISOString() }
+  if (existing.rows.length > 0) {
+    return existing.rows[0] as unknown as User
+  }
+
+  const result = await client.execute({
+    sql: 'INSERT INTO users (name) VALUES (?)',
+    args: [name]
+  })
+
+  return {
+    id: Number(result.lastInsertRowid),
+    name,
+    created_at: new Date().toISOString()
+  }
 }
 
-export function getUser(name: string): User | undefined {
-  return db.prepare('SELECT * FROM users WHERE name = ?').get(name) as User | undefined
+export async function getUser(name: string): Promise<User | undefined> {
+  const client = getDb()
+  const result = await client.execute({
+    sql: 'SELECT * FROM users WHERE name = ?',
+    args: [name]
+  })
+  return result.rows[0] as unknown as User | undefined
 }
 
-export function getAllUsers(): User[] {
-  return db.prepare('SELECT * FROM users ORDER BY name').all() as User[]
+export async function getAllUsers(): Promise<User[]> {
+  const client = getDb()
+  const result = await client.execute('SELECT * FROM users ORDER BY name')
+  return result.rows as unknown as User[]
 }
 
 // Stats operations
-export function upsertDailyStats(userId: number, stats: StatsPayload): void {
-  db.prepare(`
-    INSERT INTO daily_stats (user_id, date, input_tokens, output_tokens, cache_creation_tokens, cache_read_tokens, total_tokens, total_cost, models_used)
-    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
-    ON CONFLICT(user_id, date) DO UPDATE SET
-      input_tokens = excluded.input_tokens,
-      output_tokens = excluded.output_tokens,
-      cache_creation_tokens = excluded.cache_creation_tokens,
-      cache_read_tokens = excluded.cache_read_tokens,
-      total_tokens = excluded.total_tokens,
-      total_cost = excluded.total_cost,
-      models_used = excluded.models_used,
-      submitted_at = datetime('now')
-  `).run(
-    userId,
-    stats.date,
-    stats.inputTokens,
-    stats.outputTokens,
-    stats.cacheCreationTokens,
-    stats.cacheReadTokens,
-    stats.totalTokens,
-    stats.totalCost,
-    JSON.stringify(stats.modelsUsed)
-  )
+export async function upsertDailyStats(userId: number, stats: StatsPayload): Promise<void> {
+  const client = getDb()
+  await client.execute({
+    sql: `
+      INSERT INTO daily_stats (user_id, date, input_tokens, output_tokens, cache_creation_tokens, cache_read_tokens, total_tokens, total_cost, models_used)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+      ON CONFLICT(user_id, date) DO UPDATE SET
+        input_tokens = excluded.input_tokens,
+        output_tokens = excluded.output_tokens,
+        cache_creation_tokens = excluded.cache_creation_tokens,
+        cache_read_tokens = excluded.cache_read_tokens,
+        total_tokens = excluded.total_tokens,
+        total_cost = excluded.total_cost,
+        models_used = excluded.models_used,
+        submitted_at = datetime('now')
+    `,
+    args: [
+      userId,
+      stats.date,
+      stats.inputTokens,
+      stats.outputTokens,
+      stats.cacheCreationTokens,
+      stats.cacheReadTokens,
+      stats.totalTokens,
+      stats.totalCost,
+      JSON.stringify(stats.modelsUsed)
+    ]
+  })
 }
 
-export function bulkUpsertStats(userName: string, dailyStats: StatsPayload[]): void {
-  const user = getOrCreateUser(userName)
-  const insertMany = db.transaction((stats: StatsPayload[]) => {
-    for (const s of stats) {
-      upsertDailyStats(user.id, s)
-    }
-  })
-  insertMany(dailyStats)
+export async function bulkUpsertStats(userName: string, dailyStats: StatsPayload[]): Promise<void> {
+  const user = await getOrCreateUser(userName)
+  for (const s of dailyStats) {
+    await upsertDailyStats(user.id, s)
+  }
 }
 
 // Leaderboard
@@ -153,7 +186,6 @@ export function getPeriodDates(period: Period): { since: string; until: string; 
     }
 
     case 'semester': {
-      // H1: Jan-Jun, H2: Jul-Dec
       const semesterStart = month < 6 ? `${year}-01-01` : `${year}-07-01`
       const semesterLabel = month < 6 ? `H1 ${year}` : `H2 ${year}`
       return { since: semesterStart, until: today, label: semesterLabel }
@@ -169,22 +201,28 @@ export function getPeriodDates(period: Period): { since: string; until: string; 
   }
 }
 
-export function getLeaderboard(period: Period = 'month'): { period: string; leaderboard: LeaderboardEntry[] } {
+export async function getLeaderboard(period: Period = 'month'): Promise<{ period: string; leaderboard: LeaderboardEntry[] }> {
+  const client = getDb()
   const { since, label } = getPeriodDates(period)
 
-  const rows = db.prepare(`
-    SELECT
-      u.name,
-      SUM(ds.total_tokens) as total_tokens,
-      SUM(ds.total_cost) as total_cost,
-      COUNT(DISTINCT ds.date) as days_active,
-      CAST(SUM(ds.total_tokens) AS REAL) / MAX(COUNT(DISTINCT ds.date), 1) as avg_tokens_per_day
-    FROM users u
-    LEFT JOIN daily_stats ds ON u.id = ds.user_id AND ds.date >= ?
-    GROUP BY u.id, u.name
-    HAVING total_tokens > 0
-    ORDER BY total_tokens DESC
-  `).all(since) as Omit<LeaderboardEntry, 'rank'>[]
+  const result = await client.execute({
+    sql: `
+      SELECT
+        u.name,
+        SUM(ds.total_tokens) as total_tokens,
+        SUM(ds.total_cost) as total_cost,
+        COUNT(DISTINCT ds.date) as days_active,
+        CAST(SUM(ds.total_tokens) AS REAL) / MAX(COUNT(DISTINCT ds.date), 1) as avg_tokens_per_day
+      FROM users u
+      LEFT JOIN daily_stats ds ON u.id = ds.user_id AND ds.date >= ?
+      GROUP BY u.id, u.name
+      HAVING total_tokens > 0
+      ORDER BY total_tokens DESC
+    `,
+    args: [since]
+  })
+
+  const rows = result.rows as unknown as Omit<LeaderboardEntry, 'rank'>[]
 
   return {
     period: label,
@@ -192,28 +230,38 @@ export function getLeaderboard(period: Period = 'month'): { period: string; lead
   }
 }
 
-export function getUserStats(userName: string, period: Period = 'month') {
-  const user = getUser(userName)
+export async function getUserStats(userName: string, period: Period = 'month') {
+  const client = getDb()
+  const user = await getUser(userName)
   if (!user) return null
 
   const { since, label } = getPeriodDates(period)
 
-  const stats = db.prepare(`
-    SELECT * FROM daily_stats
-    WHERE user_id = ? AND date >= ?
-    ORDER BY date DESC
-  `).all(user.id, since) as DailyStats[]
+  const statsResult = await client.execute({
+    sql: `
+      SELECT * FROM daily_stats
+      WHERE user_id = ? AND date >= ?
+      ORDER BY date DESC
+    `,
+    args: [user.id, since]
+  })
 
-  const totals = db.prepare(`
-    SELECT
-      SUM(total_tokens) as total_tokens,
-      SUM(total_cost) as total_cost,
-      COUNT(*) as days_active
-    FROM daily_stats
-    WHERE user_id = ? AND date >= ?
-  `).get(user.id, since) as { total_tokens: number; total_cost: number; days_active: number }
+  const totalsResult = await client.execute({
+    sql: `
+      SELECT
+        SUM(total_tokens) as total_tokens,
+        SUM(total_cost) as total_cost,
+        COUNT(*) as days_active
+      FROM daily_stats
+      WHERE user_id = ? AND date >= ?
+    `,
+    args: [user.id, since]
+  })
+
+  const stats = statsResult.rows as unknown as DailyStats[]
+  const totals = totalsResult.rows[0] as unknown as { total_tokens: number; total_cost: number; days_active: number }
 
   return { user, stats, totals, period: label }
 }
 
-export default db
+export { getDb }

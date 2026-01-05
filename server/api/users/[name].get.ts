@@ -2,7 +2,7 @@ import { getUserStats, type Period } from '../../utils/db'
 
 const validPeriods: Period[] = ['today', 'week', 'month', 'semester', 'year', 'all']
 
-export default defineEventHandler((event) => {
+export default defineEventHandler(async (event) => {
   const name = getRouterParam(event, 'name')
   const query = getQuery(event)
   let period = (query.period as Period) || 'month'
@@ -15,7 +15,7 @@ export default defineEventHandler((event) => {
     throw createError({ statusCode: 400, message: 'name is required' })
   }
 
-  const stats = getUserStats(name, period)
+  const stats = await getUserStats(name, period)
 
   if (!stats) {
     throw createError({ statusCode: 404, message: 'User not found' })

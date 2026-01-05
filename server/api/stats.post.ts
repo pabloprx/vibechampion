@@ -17,7 +17,7 @@ export default defineEventHandler(async (event) => {
   }
 
   try {
-    bulkUpsertStats(body.user, body.daily)
+    await bulkUpsertStats(body.user, body.daily)
     return { success: true, message: `Synced ${body.daily.length} days for ${body.user}` }
   } catch (err: any) {
     throw createError({ statusCode: 500, message: err.message })

@@ -9,7 +9,7 @@
     "preview": "nuxt preview"
   },
   "dependencies": {
-    "better-sqlite3": "^11.7.0",
+    "@libsql/client": "^0.15.15",
     "nuxt": "^3.14.0"
   },
   "devDependencies": {

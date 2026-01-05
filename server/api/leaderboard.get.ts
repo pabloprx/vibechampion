@@ -2,7 +2,7 @@ import { getLeaderboard, type Period } from '../utils/db'
 
 const validPeriods: Period[] = ['today', 'week', 'month', 'semester', 'year', 'all']
 
-export default defineEventHandler((event) => {
+export default defineEventHandler(async (event) => {
   const query = getQuery(event)
   let period = (query.period as Period) || 'month'
 
@@ -10,5 +10,5 @@ export default defineEventHandler((event) => {
     period = 'month'
   }
 
-  return getLeaderboard(period)
+  return await getLeaderboard(period)
 })
