@@ -8,7 +8,7 @@
   "plugins": [
     {
       "name": "vibechampion",
-      "source": "plugins/vibechampion"
+      "source": "./plugins/vibechampion"
     }
   ]
 }
