@@ -127,11 +127,15 @@ interface LeaderboardResponse {
   leaderboard: LeaderboardEntry[]
 }
 
-const showLeaderboard = ref(false)
+const showLeaderboard = ref(true)
 const loading = ref(false)
 const leaderboardData = ref<LeaderboardResponse | null>(null)
 const period = ref('month')
 const copiedIndex = ref<number | null>(null)
+
+onMounted(() => {
+  fetchLeaderboard()
+})
 
 const periods = [
   { label: 'today', value: 'today' },
