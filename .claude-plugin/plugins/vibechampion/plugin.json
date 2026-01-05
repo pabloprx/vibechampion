@@ -2,13 +2,12 @@
   "name": "vibechampion",
   "version": "1.0.0",
   "description": "Track and compare Claude Code usage with your team",
-  "commands": ["commands/vibebattle.md"],
-  "hooks": {
-    "Stop": [
-      {
-        "command": "bash $PLUGIN_DIR/scripts/sync.sh",
-        "timeout": 30000
-      }
-    ]
-  }
+  "commands": ["./commands/vibebattle.md"],
+  "hooks": [
+    {
+      "event": "Stop",
+      "command": "bash $PLUGIN_DIR/scripts/sync.sh",
+      "timeout": 30000
+    }
+  ]
 }
