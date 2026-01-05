@@ -1,0 +1,5 @@
+{
+  "name": "pabloprx-vibechampion",
+  "description": "VibeBattle - Track and compare Claude Code usage with your team",
+  "plugins": ["plugins/vibechampion"]
+}
