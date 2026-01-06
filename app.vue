@@ -138,7 +138,9 @@
 </template>
 
 <script setup lang="ts">
-import { ref, watch, onMounted } from 'vue'
+import { ref, watch, onMounted, onUnmounted } from 'vue'
+
+const REFETCH_INTERVAL = 2 * 60 * 1000 // 2 minutes
 
 interface LeaderboardEntry {
   rank: number
@@ -203,8 +205,29 @@ function getRandomRoast(name: string): string {
   return assignedRoasts.value.get(name)!
 }
 
+let refetchInterval: ReturnType<typeof setInterval> | null = null
+
+function handleVisibilityChange() {
+  if (document.visibilityState === 'visible') {
+    fetchLeaderboard()
+  }
+}
+
 onMounted(() => {
   fetchLeaderboard()
+
+  // Auto-refetch every 2 minutes
+  refetchInterval = setInterval(fetchLeaderboard, REFETCH_INTERVAL)
+
+  // Refetch on window focus
+  document.addEventListener('visibilitychange', handleVisibilityChange)
+})
+
+onUnmounted(() => {
+  if (refetchInterval) {
+    clearInterval(refetchInterval)
+  }
+  document.removeEventListener('visibilitychange', handleVisibilityChange)
 })
 
 async function fetchLeaderboard() {
