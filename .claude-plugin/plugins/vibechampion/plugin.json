@@ -1,9 +1,20 @@
 {
   "name": "vibechampion",
-  "version": "1.0.0",
+  "version": "1.1.0",
   "description": "Track and compare Claude Code usage with your team",
   "commands": ["./commands/vibebattle.md"],
   "hooks": {
+    "SessionStart": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "${CLAUDE_PLUGIN_ROOT}/scripts/sync.sh",
+            "timeout": 30
+          }
+        ]
+      }
+    ],
     "Stop": [
       {
         "hooks": [

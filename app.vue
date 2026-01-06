@@ -8,7 +8,7 @@
       <header class="header">
         <div class="logo">
           <span class="logo-text">VIBE<span class="logo-accent">CHAMPION</span></span>
-          <span class="logo-version">v1.0</span>
+          <span class="logo-version">v1.1</span>
         </div>
         <div class="status">
           <span class="status-dot"></span>
@@ -40,6 +40,25 @@
             <p class="terminal-hint">
               <span class="blink">&gt;</span> then run <span class="highlight">/vibebattle</span>
             </p>
+
+            <!-- Update notice -->
+            <div class="update-notice">
+              <div class="update-header">
+                <span class="update-badge">v1.1</span>
+                <span class="update-title">new update available</span>
+              </div>
+              <p class="update-desc">now syncs on session start + end for better tracking</p>
+              <div class="update-cmd" @click="copyCommand(2)">
+                <span class="prompt">&gt;</span>
+                <code>claude plugin update vibechampion@pabloprx-vibechampion</code>
+                <span class="copied-badge" v-if="copiedIndex === 2">COPIED</span>
+              </div>
+              <p class="update-link">
+                <a href="https://github.com/pabloprx/vibechampion" target="_blank">
+                  view source on github <span class="arrow">&rarr;</span>
+                </a>
+              </p>
+            </div>
           </div>
         </section>
 
@@ -104,7 +123,7 @@
           <div class="panel-footer">
             <span>{{ leaderboardData?.period || '---' }}</span>
             <span class="separator">|</span>
-            <span>auto-sync on session end</span>
+            <span>auto-sync on session start + end</span>
           </div>
         </section>
       </div>
@@ -148,7 +167,8 @@ const periods = [
 
 const commands = [
   'claude plugin marketplace add pabloprx/vibechampion',
-  'claude plugin install vibechampion@pabloprx-vibechampion'
+  'claude plugin install vibechampion@pabloprx-vibechampion',
+  'claude plugin update vibechampion@pabloprx-vibechampion'
 ]
 
 const roasts = [
@@ -488,6 +508,91 @@ html, body {
 
 .highlight {
   color: var(--accent);
+}
+
+/* Update notice */
+.update-notice {
+  margin-top: 1.5rem;
+  padding-top: 1.5rem;
+  border-top: 1px dashed var(--border);
+}
+
+.update-header {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin-bottom: 0.5rem;
+}
+
+.update-badge {
+  background: var(--accent);
+  color: var(--bg);
+  font-size: 0.65rem;
+  font-weight: 600;
+  padding: 0.15rem 0.4rem;
+  border-radius: 3px;
+  letter-spacing: 0.5px;
+}
+
+.update-title {
+  font-size: 0.85rem;
+  color: var(--text);
+  font-weight: 500;
+}
+
+.update-desc {
+  font-size: 0.8rem;
+  color: var(--text-dim);
+  margin-bottom: 0.75rem;
+}
+
+.update-cmd {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 0.75rem 1rem;
+  background: var(--bg);
+  border-radius: 6px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  margin-bottom: 0.75rem;
+}
+
+.update-cmd:hover {
+  background: var(--accent-soft);
+}
+
+.update-cmd code {
+  font-size: 0.75rem;
+  color: var(--text-dim);
+  flex: 1;
+}
+
+.update-cmd:hover code {
+  color: var(--text);
+}
+
+.update-link {
+  font-size: 0.75rem;
+}
+
+.update-link a {
+  color: var(--text-dim);
+  text-decoration: none;
+  transition: color 0.2s ease;
+}
+
+.update-link a:hover {
+  color: var(--accent);
+}
+
+.update-link .arrow {
+  display: inline-block;
+  transition: transform 0.2s ease;
+}
+
+.update-link a:hover .arrow {
+  transform: translateX(3px);
 }
 
 /* Period tabs */
