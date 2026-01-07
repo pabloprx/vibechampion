@@ -66,15 +66,27 @@
         <section class="panel rankings-panel">
           <div class="panel-header">
             <span class="comment">// rankings</span>
-            <div class="period-tabs">
-              <button
-                v-for="p in periods"
-                :key="p.value"
-                :class="{ active: period === p.value }"
-                @click="period = p.value"
-              >
-                {{ p.label }}
-              </button>
+            <div class="filter-row">
+              <div class="metric-tabs">
+                <button
+                  v-for="m in metrics"
+                  :key="m.value"
+                  :class="{ active: sortBy === m.value }"
+                  @click="sortBy = m.value"
+                >
+                  {{ m.label }}
+                </button>
+              </div>
+              <div class="period-tabs">
+                <button
+                  v-for="p in periods"
+                  :key="p.value"
+                  :class="{ active: period === p.value }"
+                  @click="period = p.value"
+                >
+                  {{ p.label }}
+                </button>
+              </div>
             </div>
           </div>
           <div class="panel-content">
@@ -84,22 +96,26 @@
             </div>
 
             <div v-else-if="leaderboardData?.leaderboard?.length" class="rankings">
+              <div class="rankings-header">
+                <span class="col-rank">#</span>
+                <span class="col-name">USER</span>
+                <span class="col-metric">{{ getMetricLabel() }}</span>
+              </div>
               <div class="rankings-body">
                 <div
                   v-for="(entry, index) in leaderboardData.leaderboard"
                   :key="entry.name"
                   class="ranking-row"
                   :class="{ champion: index === 0, 'top-3': index < 3 }"
+                  @mouseenter="index === 0 && handleWinnerHover(true)"
+                  @mouseleave="index === 0 && handleWinnerHover(false)"
                 >
                   <span class="col-rank">
                     <span v-if="index === 0" class="crown">&#9733;</span>
                     <span v-else>{{ entry.rank }}</span>
                   </span>
                   <span class="col-name">{{ entry.name }}</span>
-                  <span class="col-stats">
-                    <span class="tokens">{{ formatTokens(entry.total_tokens) }}</span>
-                    <span class="cost">${{ entry.total_cost.toFixed(0) }}</span>
-                  </span>
+                  <span class="col-metric metric-value">{{ getMetricValue(entry) }}</span>
                 </div>
               </div>
               <!-- Floating roasts -->
@@ -146,19 +162,26 @@ interface LeaderboardEntry {
   rank: number
   name: string
   total_tokens: number
+  output_tokens: number
+  vibe_score: number
   total_cost: number
   days_active: number
 }
 
 interface LeaderboardResponse {
   period: string
+  sortBy: string
   leaderboard: LeaderboardEntry[]
 }
+
+type SortMetric = 'vibe_score' | 'total_tokens' | 'output_tokens' | 'total_cost'
 
 const loading = ref(false)
 const leaderboardData = ref<LeaderboardResponse | null>(null)
 const period = ref('month')
+const sortBy = ref<SortMetric>('vibe_score')
 const copiedIndex = ref<number | null>(null)
+const hoveredWinner = ref(false)
 
 const periods = [
   { label: 'DAY', value: 'today' },
@@ -166,6 +189,30 @@ const periods = [
   { label: 'MONTH', value: 'month' },
   { label: 'ALL', value: 'all' },
 ]
+
+const metrics = [
+  { label: 'VIBE', value: 'vibe_score' as SortMetric },
+  { label: 'TOKENS', value: 'total_tokens' as SortMetric },
+  { label: 'OUTPUT', value: 'output_tokens' as SortMetric },
+  { label: 'COST', value: 'total_cost' as SortMetric },
+]
+
+function getMetricValue(entry: LeaderboardEntry): string {
+  switch (sortBy.value) {
+    case 'vibe_score':
+      return formatTokens(entry.vibe_score)
+    case 'total_tokens':
+      return formatTokens(entry.total_tokens)
+    case 'output_tokens':
+      return formatTokens(entry.output_tokens)
+    case 'total_cost':
+      return '$' + entry.total_cost.toFixed(0)
+  }
+}
+
+function getMetricLabel(): string {
+  return metrics.find(m => m.value === sortBy.value)?.label || 'VIBE'
+}
 
 const commands = [
   'claude plugin marketplace add pabloprx/vibechampion',
@@ -215,6 +262,7 @@ function handleVisibilityChange() {
 
 onMounted(() => {
   fetchLeaderboard()
+  loadConfetti()
 
   // Auto-refetch every 2 minutes
   refetchInterval = setInterval(fetchLeaderboard, REFETCH_INTERVAL)
@@ -233,12 +281,39 @@ onUnmounted(() => {
 async function fetchLeaderboard() {
   loading.value = true
   try {
-    const res = await fetch(`/api/leaderboard?period=${period.value}`)
+    const res = await fetch(`/api/leaderboard?period=${period.value}&sortBy=${sortBy.value}`)
     leaderboardData.value = await res.json()
   } catch (e) {
     console.error('Failed to fetch leaderboard:', e)
   } finally {
     loading.value = false
+  }
+}
+
+// Confetti for winner
+let confettiInstance: any = null
+
+async function loadConfetti() {
+  if (typeof window !== 'undefined' && !confettiInstance) {
+    const { default: confetti } = await import('canvas-confetti')
+    confettiInstance = confetti
+  }
+}
+
+function triggerConfetti() {
+  if (!confettiInstance) return
+  confettiInstance({
+    particleCount: 100,
+    spread: 70,
+    origin: { y: 0.3 },
+    colors: ['#4ade80', '#22c55e', '#16a34a']
+  })
+}
+
+function handleWinnerHover(isHovering: boolean) {
+  hoveredWinner.value = isHovering
+  if (isHovering) {
+    triggerConfetti()
   }
 }
 
@@ -267,7 +342,7 @@ async function copyCommand(index: number) {
   }
 }
 
-watch(period, () => {
+watch([period, sortBy], () => {
   fetchLeaderboard()
 })
 </script>
@@ -412,10 +487,10 @@ html, body {
   50% { opacity: 0.4; }
 }
 
-/* Grid */
+/* Grid - rankings panel is wider */
 .grid {
   display: grid;
-  grid-template-columns: 1fr 1fr;
+  grid-template-columns: 1fr 1.4fr;
   gap: 2rem;
   flex: 1;
 }
@@ -618,13 +693,22 @@ html, body {
   transform: translateX(3px);
 }
 
+/* Filter row */
+.filter-row {
+  display: flex;
+  gap: 1rem;
+  align-items: center;
+}
+
 /* Period tabs */
-.period-tabs {
+.period-tabs,
+.metric-tabs {
   display: flex;
   gap: 0.25rem;
 }
 
-.period-tabs button {
+.period-tabs button,
+.metric-tabs button {
   background: transparent;
   border: none;
   color: var(--text-dim);
@@ -636,14 +720,21 @@ html, body {
   transition: all 0.15s ease;
 }
 
-.period-tabs button:hover {
+.period-tabs button:hover,
+.metric-tabs button:hover {
   color: var(--text);
   background: var(--border);
 }
 
-.period-tabs button.active {
+.period-tabs button.active,
+.metric-tabs button.active {
   color: var(--accent);
   background: var(--accent-soft);
+}
+
+.metric-tabs {
+  border-right: 1px solid var(--border);
+  padding-right: 1rem;
 }
 
 /* Rankings */
@@ -653,6 +744,23 @@ html, body {
   position: relative;
 }
 
+.rankings-header {
+  display: grid;
+  grid-template-columns: 2.5rem 1fr auto;
+  gap: 0.75rem;
+  padding: 0.5rem 1rem;
+  font-size: 0.7rem;
+  color: var(--text-dim);
+  text-transform: uppercase;
+  letter-spacing: 1px;
+  border-bottom: 1px solid var(--border);
+}
+
+.rankings-header .col-metric {
+  text-align: right;
+  min-width: 5rem;
+}
+
 .rankings-body {
   display: flex;
   flex-direction: column;
@@ -660,10 +768,10 @@ html, body {
 
 .ranking-row {
   display: grid;
-  grid-template-columns: 2rem auto 1fr;
+  grid-template-columns: 2.5rem 1fr auto;
   gap: 0.75rem;
   padding: 1rem;
-  font-size: 0.9rem;
+  font-size: 0.95rem;
   border-bottom: 1px solid var(--border);
   transition: all 0.15s ease;
   align-items: center;
@@ -679,11 +787,18 @@ html, body {
 
 .ranking-row.champion {
   background: var(--accent-soft);
+  font-size: 1.1rem;
 }
 
 .ranking-row.champion .col-name,
 .ranking-row.champion .col-rank {
   color: var(--accent);
+  font-weight: 600;
+}
+
+.ranking-row.champion .col-metric {
+  color: var(--accent);
+  font-weight: 600;
 }
 
 .ranking-row.top-3:not(.champion) .col-rank {
@@ -697,29 +812,22 @@ html, body {
 
 .crown {
   color: var(--accent);
-  font-size: 1rem;
+  font-size: 1.2rem;
 }
 
 .col-name {
   font-weight: 500;
 }
 
-.col-stats {
-  display: flex;
-  gap: 0.75rem;
+.col-metric {
+  text-align: right;
+  min-width: 5rem;
+  font-family: 'IBM Plex Mono', monospace;
+}
+
+.metric-value {
   color: var(--text-dim);
-  font-size: 0.8rem;
-  justify-content: flex-end;
-}
-
-.col-stats .tokens {
-  min-width: 4rem;
-  text-align: right;
-}
-
-.col-stats .cost {
-  min-width: 3rem;
-  text-align: right;
+  font-size: 0.85rem;
 }
 
 /* Floating roasts - handwritten style */
@@ -851,6 +959,27 @@ html, body {
   }
 }
 
+@media (max-width: 900px) {
+  .panel-header {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 0.75rem;
+  }
+
+  .filter-row {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 0.5rem;
+  }
+
+  .metric-tabs {
+    border-right: none;
+    padding-right: 0;
+    border-bottom: 1px solid var(--border);
+    padding-bottom: 0.5rem;
+  }
+}
+
 @media (max-width: 800px) {
   .screen {
     padding: 1.5rem;
@@ -872,6 +1001,10 @@ html, body {
 
   .ranking-row {
     font-size: 0.85rem;
+  }
+
+  .ranking-row.champion {
+    font-size: 0.95rem;
   }
 }
 </style>

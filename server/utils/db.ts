@@ -155,22 +155,38 @@ export interface LeaderboardEntry {
   rank: number
   name: string
   total_tokens: number
+  output_tokens: number
+  input_tokens: number
+  cache_read_tokens: number
+  vibe_score: number
   total_cost: number
   days_active: number
-  avg_tokens_per_day: number
 }
 
+export type SortMetric = 'vibe_score' | 'total_tokens' | 'output_tokens' | 'total_cost'
+
 export type Period = 'today' | 'week' | 'month' | 'semester' | 'year' | 'all'
+
+function formatLocalDate(d: Date): string {
+  const year = d.getFullYear()
+  const month = String(d.getMonth() + 1).padStart(2, '0')
+  const day = String(d.getDate()).padStart(2, '0')
+  return `${year}-${month}-${day}`
+}
 
 export function getPeriodDates(period: Period): { since: string; until: string; label: string } {
   const now = new Date()
   const year = now.getFullYear()
   const month = now.getMonth()
-  const today = now.toISOString().split('T')[0]
+  const today = formatLocalDate(now)
 
   switch (period) {
-    case 'today':
-      return { since: today, until: today, label: 'Today' }
+    case 'today': {
+      // Include yesterday to handle timezone differences (server UTC vs client local)
+      const yesterday = new Date(now)
+      yesterday.setDate(now.getDate() - 1)
+      return { since: formatLocalDate(yesterday), until: today, label: 'Today' }
+    }
 
     case 'week': {
       const dayOfWeek = now.getDay()
@@ -201,23 +217,31 @@ export function getPeriodDates(period: Period): { since: string; until: string; 
   }
 }
 
-export async function getLeaderboard(period: Period = 'month'): Promise<{ period: string; leaderboard: LeaderboardEntry[] }> {
+export async function getLeaderboard(
+  period: Period = 'month',
+  sortBy: SortMetric = 'vibe_score'
+): Promise<{ period: string; sortBy: SortMetric; leaderboard: LeaderboardEntry[] }> {
   const client = getDb()
   const { since, label } = getPeriodDates(period)
 
+  // vibe_score = output + input + cache_creation (excludes cache_read - it's just loading context)
   const result = await client.execute({
     sql: `
       SELECT
         u.name,
-        SUM(ds.total_tokens) as total_tokens,
-        SUM(ds.total_cost) as total_cost,
-        COUNT(DISTINCT ds.date) as days_active,
-        CAST(SUM(ds.total_tokens) AS REAL) / MAX(COUNT(DISTINCT ds.date), 1) as avg_tokens_per_day
+        COALESCE(SUM(ds.total_tokens), 0) as total_tokens,
+        COALESCE(SUM(ds.output_tokens), 0) as output_tokens,
+        COALESCE(SUM(ds.input_tokens), 0) as input_tokens,
+        COALESCE(SUM(ds.cache_read_tokens), 0) as cache_read_tokens,
+        COALESCE(SUM(ds.cache_creation_tokens), 0) as cache_creation_tokens,
+        COALESCE(SUM(ds.output_tokens) + SUM(ds.input_tokens) + SUM(ds.cache_creation_tokens), 0) as vibe_score,
+        COALESCE(SUM(ds.total_cost), 0) as total_cost,
+        COUNT(DISTINCT ds.date) as days_active
       FROM users u
       LEFT JOIN daily_stats ds ON u.id = ds.user_id AND ds.date >= ?
       GROUP BY u.id, u.name
-      HAVING total_tokens > 0
-      ORDER BY total_tokens DESC
+      HAVING vibe_score > 0 OR total_tokens > 0
+      ORDER BY ${sortBy} DESC
     `,
     args: [since]
   })
@@ -226,6 +250,7 @@ export async function getLeaderboard(period: Period = 'month'): Promise<{ period
 
   return {
     period: label,
+    sortBy,
     leaderboard: rows.map((r, i) => ({ ...r, rank: i + 1 }))
   }
 }
