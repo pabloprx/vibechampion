@@ -73,35 +73,44 @@
               <span class="loading-text">FETCHING DATA</span>
             </div>
 
-            <div v-else-if="leaderboardData?.leaderboard?.length" class="rankings">
+            <div v-else-if="displayData?.length" class="rankings">
               <div class="rankings-table">
                 <div class="table-header">
                   <span class="th-rank">RANK</span>
                   <span class="th-user">USER</span>
+                  <span class="th-bar"></span>
                   <span class="th-score">{{ getMetricLabel() }}</span>
                 </div>
-                <div class="table-body">
+                <div class="table-body" :class="{ 'is-shuffling': isShuffling }">
                   <div
-                    v-for="(entry, index) in leaderboardData.leaderboard"
+                    v-for="(entry, index) in displayData"
                     :key="entry.name"
                     class="table-row"
                     :class="{
-                      'is-champion': index === 0,
+                      'is-champion': index === 0 && !isShuffling,
                       'is-top3': index < 3,
                       'is-even': index % 2 === 0
                     }"
-                    @mouseenter="index === 0 && handleWinnerHover(true)"
-                    @mouseleave="index === 0 && handleWinnerHover(false)"
+                    @mouseenter="index === 0 && !isShuffling && handleWinnerHover(true)"
+                    @mouseleave="index === 0 && !isShuffling && handleWinnerHover(false)"
                   >
                     <span class="td-rank">
-                      <span v-if="index === 0" class="champion-badge">
+                      <span v-if="index === 0 && !isShuffling" class="champion-badge">
                         <span class="crown-icon">&#9733;</span>
                       </span>
-                      <span v-else class="rank-num">{{ entry.rank }}</span>
+                      <span v-else class="rank-num">{{ index + 1 }}</span>
                     </span>
                     <span class="td-user">
                       <span class="user-name">{{ entry.name }}</span>
-                      <span v-if="index < 3" class="roast">{{ getRandomRoast(entry.name) }}</span>
+                      <span v-if="index < 3 && !isShuffling" class="roast">{{ getRandomRoast(entry.name) }}</span>
+                    </span>
+                    <span class="td-bar">
+                      <div class="bar-track">
+                        <div
+                          class="bar-fill"
+                          :style="{ width: (isShuffling ? 50 + Math.random() * 50 : getScorePercent(entry)) + '%' }"
+                        ></div>
+                      </div>
                     </span>
                     <span class="td-score">{{ getMetricValue(entry) }}</span>
                   </div>
@@ -213,11 +222,14 @@ type SortMetric = 'vibe_score' | 'total_tokens' | 'output_tokens' | 'total_cost'
 
 const loading = ref(false)
 const leaderboardData = ref<LeaderboardResponse | null>(null)
+const displayData = ref<LeaderboardEntry[]>([])
+const isShuffling = ref(false)
 const period = ref('month')
 const sortBy = ref<SortMetric>('vibe_score')
 const copiedIndex = ref<number | null>(null)
 const copiedUpdate = ref(false)
 const hoveredWinner = ref(false)
+const hasAnimated = ref(false)
 
 const periods = [
   { label: 'DAY', value: 'today' },
@@ -248,6 +260,46 @@ function getMetricValue(entry: LeaderboardEntry): string {
 
 function getMetricLabel(): string {
   return metrics.find(m => m.value === sortBy.value)?.label || 'VIBE'
+}
+
+function getScorePercent(entry: LeaderboardEntry): number {
+  if (!leaderboardData.value?.leaderboard?.length) return 0
+  const max = getNumericScore(leaderboardData.value.leaderboard[0])
+  const current = getNumericScore(entry)
+  return max > 0 ? (current / max) * 100 : 0
+}
+
+function getNumericScore(entry: LeaderboardEntry): number {
+  switch (sortBy.value) {
+    case 'vibe_score': return entry.vibe_score
+    case 'total_tokens': return entry.total_tokens
+    case 'output_tokens': return entry.output_tokens
+    case 'total_cost': return entry.total_cost
+  }
+}
+
+async function shuffleAnimation(data: LeaderboardEntry[]) {
+  if (data.length < 2 || hasAnimated.value) {
+    displayData.value = data
+    return
+  }
+
+  hasAnimated.value = true
+  isShuffling.value = true
+
+  // Create shuffled versions
+  const shuffles = 6
+  const intervalMs = 300
+
+  for (let i = 0; i < shuffles; i++) {
+    const shuffled = [...data].sort(() => Math.random() - 0.5)
+    displayData.value = shuffled
+    await new Promise(r => setTimeout(r, intervalMs))
+  }
+
+  // Final reveal - settle to real order
+  displayData.value = data
+  isShuffling.value = false
 }
 
 const commands = [
@@ -297,9 +349,9 @@ function handleVisibilityChange() {
 
 onMounted(() => {
   loadFromUrlParams()
-  fetchLeaderboard()
+  fetchLeaderboard(true) // animate on first load
   loadConfetti()
-  refetchInterval = setInterval(fetchLeaderboard, REFETCH_INTERVAL)
+  refetchInterval = setInterval(() => fetchLeaderboard(false), REFETCH_INTERVAL)
   document.addEventListener('visibilitychange', handleVisibilityChange)
 })
 
@@ -308,11 +360,17 @@ onUnmounted(() => {
   document.removeEventListener('visibilitychange', handleVisibilityChange)
 })
 
-async function fetchLeaderboard() {
+async function fetchLeaderboard(animate = false) {
   loading.value = true
   try {
     const res = await fetch(`/api/leaderboard?period=${period.value}&sortBy=${sortBy.value}`)
     leaderboardData.value = await res.json()
+
+    if (animate && leaderboardData.value?.leaderboard) {
+      await shuffleAnimation(leaderboardData.value.leaderboard)
+    } else if (leaderboardData.value?.leaderboard) {
+      displayData.value = leaderboardData.value.leaderboard
+    }
   } catch (e) {
     console.error('Failed to fetch leaderboard:', e)
   } finally {
@@ -673,7 +731,7 @@ html, body {
 
 .table-header {
   display: grid;
-  grid-template-columns: 80px 1fr 120px;
+  grid-template-columns: 70px 1fr 200px 100px;
   padding: 0.75rem 1.5rem;
   background: var(--bg-elevated);
   border-bottom: 1px solid var(--border);
@@ -689,13 +747,22 @@ html, body {
   flex-direction: column;
 }
 
+.table-body.is-shuffling .table-row {
+  animation: rowPulse 0.3s ease-in-out;
+}
+
+@keyframes rowPulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.7; }
+}
+
 .table-row {
   display: grid;
-  grid-template-columns: 80px 1fr 120px;
+  grid-template-columns: 70px 1fr 200px 100px;
   padding: 1rem 1.5rem;
   align-items: center;
   border-bottom: 1px solid var(--border);
-  transition: all 0.15s ease;
+  transition: background 0.15s ease, border-color 0.15s ease;
 }
 
 .table-row:last-child {
@@ -775,6 +842,36 @@ html, body {
 .table-row.is-champion .td-score {
   color: var(--accent);
   font-size: 1.1rem;
+}
+
+/* Progress Bar */
+.td-bar {
+  padding: 0 0.5rem;
+}
+
+.bar-track {
+  width: 100%;
+  height: 8px;
+  background: var(--bg-deep);
+  border-radius: 4px;
+  overflow: hidden;
+  border: 1px solid var(--border);
+}
+
+.bar-fill {
+  height: 100%;
+  background: linear-gradient(90deg, var(--accent-dim), var(--accent));
+  border-radius: 3px;
+  transition: width 0.4s ease-out;
+  box-shadow: 0 0 8px var(--accent-glow);
+}
+
+.table-row.is-champion .bar-fill {
+  box-shadow: 0 0 12px var(--accent-glow), 0 0 20px var(--accent-glow);
+}
+
+.is-shuffling .bar-fill {
+  transition: none;
 }
 
 /* Rankings Footer */
@@ -1126,7 +1223,7 @@ html, body {
 
   .table-header,
   .table-row {
-    grid-template-columns: 60px 1fr 80px;
+    grid-template-columns: 50px 1fr 120px 70px;
     padding: 0.75rem 1rem;
   }
 
@@ -1136,6 +1233,18 @@ html, body {
 
   .td-score {
     font-size: 0.85rem;
+  }
+}
+
+@media (max-width: 600px) {
+  .td-bar,
+  .th-bar {
+    display: none;
+  }
+
+  .table-header,
+  .table-row {
+    grid-template-columns: 50px 1fr 70px;
   }
 }
 
@@ -1152,12 +1261,17 @@ html, body {
 
   .table-header,
   .table-row {
-    grid-template-columns: 50px 1fr 70px;
+    grid-template-columns: 40px 1fr 60px;
     padding: 0.5rem 0.75rem;
   }
 
   .roast {
     display: none;
+  }
+
+  .mascot {
+    width: 36px;
+    height: 36px;
   }
 }
 </style>
