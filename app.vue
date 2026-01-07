@@ -2,153 +2,188 @@
   <div class="crt">
     <div class="scanline"></div>
     <div class="noise"></div>
-    <div class="flicker"></div>
 
     <div class="screen">
       <header class="header">
         <div class="logo">
+          <div class="mascot">
+            <svg viewBox="0 0 64 64" class="mascot-svg">
+              <!-- Body -->
+              <rect x="8" y="20" width="48" height="36" rx="4" fill="currentColor" class="mascot-body"/>
+              <!-- Eyes -->
+              <rect x="18" y="30" width="8" height="10" rx="1" fill="#0a0a0a"/>
+              <rect x="38" y="30" width="8" height="10" rx="1" fill="#0a0a0a"/>
+              <!-- Legs -->
+              <rect x="14" y="56" width="8" height="8" rx="2" fill="currentColor" class="mascot-body"/>
+              <rect x="42" y="56" width="8" height="8" rx="2" fill="currentColor" class="mascot-body"/>
+              <!-- Sparkles -->
+              <circle cx="56" cy="16" r="2" fill="currentColor" class="sparkle s1"/>
+              <circle cx="48" cy="10" r="1.5" fill="currentColor" class="sparkle s2"/>
+              <circle cx="12" cy="14" r="1.5" fill="currentColor" class="sparkle s3"/>
+            </svg>
+          </div>
           <span class="logo-text">VIBE<span class="logo-accent">CHAMPION</span></span>
-          <span class="logo-version">v1.1</span>
         </div>
         <div class="status">
           <span class="status-dot"></span>
-          <span>ONLINE</span>
+          <span>SYSTEM ONLINE</span>
         </div>
       </header>
 
-      <div class="grid">
-        <!-- Install Panel -->
-        <section class="panel install-panel">
-          <div class="panel-header">
-            <span class="comment">// install</span>
-          </div>
-          <div class="panel-content">
-            <div class="terminal">
-              <div class="terminal-line" @click="copyCommand(0)">
-                <span class="prompt">&gt;</span>
-                <code>claude plugin marketplace add pabloprx/vibechampion</code>
-                <span class="cursor" v-if="copiedIndex !== 0">_</span>
-                <span class="copied-badge" v-else>COPIED</span>
+      <main class="main">
+        <!-- Rankings - The Star -->
+        <section class="rankings-section">
+          <div class="section-header">
+            <h2 class="section-title">
+              <span class="title-decorator">//</span> LEADERBOARD
+            </h2>
+            <div class="controls">
+              <div class="control-group">
+                <span class="control-label">RANK BY</span>
+                <div class="segmented">
+                  <button
+                    v-for="m in metrics"
+                    :key="m.value"
+                    :class="{ active: sortBy === m.value }"
+                    @click="sortBy = m.value"
+                  >
+                    {{ m.label }}
+                  </button>
+                </div>
               </div>
-              <div class="terminal-line" @click="copyCommand(1)">
-                <span class="prompt">&gt;</span>
-                <code>claude plugin install vibechampion@pabloprx-vibechampion</code>
-                <span class="cursor" v-if="copiedIndex !== 1">_</span>
-                <span class="copied-badge" v-else>COPIED</span>
+              <div class="control-group">
+                <span class="control-label">PERIOD</span>
+                <div class="segmented">
+                  <button
+                    v-for="p in periods"
+                    :key="p.value"
+                    :class="{ active: period === p.value }"
+                    @click="period = p.value"
+                  >
+                    {{ p.label }}
+                  </button>
+                </div>
               </div>
             </div>
-            <p class="terminal-hint">
-              <span class="blink">&gt;</span> then run <span class="highlight">/vibebattle</span>
-            </p>
+          </div>
 
-            <!-- Update notice -->
-            <div class="update-notice">
-              <div class="update-header">
-                <span class="update-badge">v1.1</span>
-                <span class="update-title">new update available</span>
-              </div>
-              <p class="update-desc">now syncs on session start + end for better tracking</p>
-              <div class="update-cmd" @click="copyCommand(2)">
-                <span class="prompt">&gt;</span>
-                <code>claude plugin update vibechampion@pabloprx-vibechampion</code>
-                <span class="copied-badge" v-if="copiedIndex === 2">COPIED</span>
-              </div>
-              <p class="update-link">
-                <a href="https://github.com/pabloprx/vibechampion" target="_blank">
-                  view source on github <span class="arrow">&rarr;</span>
-                </a>
-              </p>
-            </div>
-          </div>
-        </section>
-
-        <!-- Rankings Panel -->
-        <section class="panel rankings-panel">
-          <div class="panel-header">
-            <span class="comment">// rankings</span>
-            <div class="filter-row">
-              <div class="metric-tabs">
-                <button
-                  v-for="m in metrics"
-                  :key="m.value"
-                  :class="{ active: sortBy === m.value }"
-                  @click="sortBy = m.value"
-                >
-                  {{ m.label }}
-                </button>
-              </div>
-              <div class="period-tabs">
-                <button
-                  v-for="p in periods"
-                  :key="p.value"
-                  :class="{ active: period === p.value }"
-                  @click="period = p.value"
-                >
-                  {{ p.label }}
-                </button>
-              </div>
-            </div>
-          </div>
-          <div class="panel-content">
+          <div class="rankings-container">
             <div v-if="loading" class="loading-state">
-              <span class="loading-bar"></span>
-              <span class="loading-text">LOADING DATA...</span>
+              <div class="loading-bar"></div>
+              <span class="loading-text">FETCHING DATA</span>
             </div>
 
             <div v-else-if="leaderboardData?.leaderboard?.length" class="rankings">
-              <div class="rankings-header">
-                <span class="col-rank">#</span>
-                <span class="col-name">USER</span>
-                <span class="col-metric">{{ getMetricLabel() }}</span>
-              </div>
-              <div class="rankings-body">
-                <div
-                  v-for="(entry, index) in leaderboardData.leaderboard"
-                  :key="entry.name"
-                  class="ranking-row"
-                  :class="{ champion: index === 0, 'top-3': index < 3 }"
-                  @mouseenter="index === 0 && handleWinnerHover(true)"
-                  @mouseleave="index === 0 && handleWinnerHover(false)"
-                >
-                  <span class="col-rank">
-                    <span v-if="index === 0" class="crown">&#9733;</span>
-                    <span v-else>{{ entry.rank }}</span>
-                  </span>
-                  <span class="col-name">{{ entry.name }}</span>
-                  <span class="col-metric metric-value">{{ getMetricValue(entry) }}</span>
+              <div class="rankings-table">
+                <div class="table-header">
+                  <span class="th-rank">RANK</span>
+                  <span class="th-user">USER</span>
+                  <span class="th-score">{{ getMetricLabel() }}</span>
                 </div>
-              </div>
-              <!-- Floating roasts -->
-              <div class="floating-roasts" v-if="leaderboardData.leaderboard.length > 0">
-                <div
-                  v-for="(entry, index) in leaderboardData.leaderboard.slice(0, 3)"
-                  :key="'roast-' + entry.name"
-                  class="floating-roast"
-                  :class="'roast-' + index"
-                >
-                  <span class="roast-arrow">&#8592;</span> {{ getRandomRoast(entry.name) }}
+                <div class="table-body">
+                  <div
+                    v-for="(entry, index) in leaderboardData.leaderboard"
+                    :key="entry.name"
+                    class="table-row"
+                    :class="{
+                      'is-champion': index === 0,
+                      'is-top3': index < 3,
+                      'is-even': index % 2 === 0
+                    }"
+                    @mouseenter="index === 0 && handleWinnerHover(true)"
+                    @mouseleave="index === 0 && handleWinnerHover(false)"
+                  >
+                    <span class="td-rank">
+                      <span v-if="index === 0" class="champion-badge">
+                        <span class="crown-icon">&#9733;</span>
+                      </span>
+                      <span v-else class="rank-num">{{ entry.rank }}</span>
+                    </span>
+                    <span class="td-user">
+                      <span class="user-name">{{ entry.name }}</span>
+                      <span v-if="index < 3" class="roast">{{ getRandomRoast(entry.name) }}</span>
+                    </span>
+                    <span class="td-score">{{ getMetricValue(entry) }}</span>
+                  </div>
                 </div>
               </div>
             </div>
 
             <div v-else class="empty-state">
-              <p class="glitch" data-text="NO DATA">NO DATA</p>
+              <div class="empty-icon">[ ]</div>
+              <p class="empty-title">NO DATA FOUND</p>
               <p class="empty-sub">be the first to join the battle</p>
             </div>
           </div>
-          <div class="panel-footer">
-            <span>{{ leaderboardData?.period || '---' }}</span>
-            <span class="separator">|</span>
-            <span>auto-sync on session start + end</span>
+
+          <div class="rankings-footer">
+            <span class="period-label">{{ leaderboardData?.period || '---' }}</span>
+            <span class="sync-info">
+              <span class="sync-dot"></span>
+              auto-sync enabled
+            </span>
           </div>
         </section>
-      </div>
 
-      <footer class="footer">
-        <a href="https://github.com/pabloprx/vibechampion" target="_blank">
-          <span class="bracket">[</span>GITHUB<span class="bracket">]</span>
-        </a>
-      </footer>
+        <!-- Install Panel - Sidebar -->
+        <aside class="install-sidebar">
+          <div class="sidebar-header">
+            <span class="sidebar-title">// quick start</span>
+          </div>
+          <div class="sidebar-content">
+            <div class="install-steps">
+              <div class="step">
+                <span class="step-num">1</span>
+                <div class="step-content">
+                  <span class="step-label">Add plugin</span>
+                  <div class="cmd" @click="copyCommand(0)">
+                    <code>claude plugin marketplace add pabloprx/vibechampion</code>
+                    <span class="cmd-action">{{ copiedIndex === 0 ? 'COPIED' : 'COPY' }}</span>
+                  </div>
+                </div>
+              </div>
+              <div class="step">
+                <span class="step-num">2</span>
+                <div class="step-content">
+                  <span class="step-label">Install</span>
+                  <div class="cmd" @click="copyCommand(1)">
+                    <code>claude plugin install vibechampion@pabloprx-vibechampion</code>
+                    <span class="cmd-action">{{ copiedIndex === 1 ? 'COPIED' : 'COPY' }}</span>
+                  </div>
+                </div>
+              </div>
+              <div class="step">
+                <span class="step-num">3</span>
+                <div class="step-content">
+                  <span class="step-label">Battle</span>
+                  <div class="cmd highlight">
+                    <code>/vibebattle</code>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <div class="update-banner">
+              <div class="update-badge">v1.1</div>
+              <div class="update-info">
+                <span class="update-title">Update available</span>
+                <span class="update-desc">Better session tracking</span>
+              </div>
+            </div>
+            <div class="update-cmd" @click="copyUpdateCommand">
+              <code>claude plugin update vibechampion@pabloprx-vibechampion</code>
+              <span class="cmd-action">{{ copiedUpdate ? 'COPIED' : 'COPY' }}</span>
+            </div>
+
+            <div class="links">
+              <a href="https://github.com/pabloprx/vibechampion" target="_blank" class="link">
+                <span class="link-icon">&gt;</span>
+                <span>GitHub</span>
+              </a>
+            </div>
+          </div>
+        </aside>
+      </main>
     </div>
   </div>
 </template>
@@ -156,7 +191,7 @@
 <script setup lang="ts">
 import { ref, watch, onMounted, onUnmounted } from 'vue'
 
-const REFETCH_INTERVAL = 2 * 60 * 1000 // 2 minutes
+const REFETCH_INTERVAL = 2 * 60 * 1000
 
 interface LeaderboardEntry {
   rank: number
@@ -181,6 +216,7 @@ const leaderboardData = ref<LeaderboardResponse | null>(null)
 const period = ref('month')
 const sortBy = ref<SortMetric>('vibe_score')
 const copiedIndex = ref<number | null>(null)
+const copiedUpdate = ref(false)
 const hoveredWinner = ref(false)
 
 const periods = [
@@ -217,7 +253,6 @@ function getMetricLabel(): string {
 const commands = [
   'claude plugin marketplace add pabloprx/vibechampion',
   'claude plugin install vibechampion@pabloprx-vibechampion',
-  'claude plugin update vibechampion@pabloprx-vibechampion'
 ]
 
 const roasts = [
@@ -261,20 +296,15 @@ function handleVisibilityChange() {
 }
 
 onMounted(() => {
+  loadFromUrlParams()
   fetchLeaderboard()
   loadConfetti()
-
-  // Auto-refetch every 2 minutes
   refetchInterval = setInterval(fetchLeaderboard, REFETCH_INTERVAL)
-
-  // Refetch on window focus
   document.addEventListener('visibilitychange', handleVisibilityChange)
 })
 
 onUnmounted(() => {
-  if (refetchInterval) {
-    clearInterval(refetchInterval)
-  }
+  if (refetchInterval) clearInterval(refetchInterval)
   document.removeEventListener('visibilitychange', handleVisibilityChange)
 })
 
@@ -290,7 +320,6 @@ async function fetchLeaderboard() {
   }
 }
 
-// Confetti for winner
 let confettiInstance: any = null
 
 async function loadConfetti() {
@@ -312,21 +341,13 @@ function triggerConfetti() {
 
 function handleWinnerHover(isHovering: boolean) {
   hoveredWinner.value = isHovering
-  if (isHovering) {
-    triggerConfetti()
-  }
+  if (isHovering) triggerConfetti()
 }
 
 function formatTokens(tokens: number): string {
-  if (tokens >= 1_000_000_000) {
-    return (tokens / 1_000_000_000).toFixed(1) + 'B'
-  }
-  if (tokens >= 1_000_000) {
-    return (tokens / 1_000_000).toFixed(1) + 'M'
-  }
-  if (tokens >= 1_000) {
-    return (tokens / 1_000).toFixed(1) + 'K'
-  }
+  if (tokens >= 1_000_000_000) return (tokens / 1_000_000_000).toFixed(1) + 'B'
+  if (tokens >= 1_000_000) return (tokens / 1_000_000).toFixed(1) + 'M'
+  if (tokens >= 1_000) return (tokens / 1_000).toFixed(1) + 'K'
   return tokens.toString()
 }
 
@@ -334,31 +355,66 @@ async function copyCommand(index: number) {
   try {
     await navigator.clipboard.writeText(commands[index])
     copiedIndex.value = index
-    setTimeout(() => {
-      copiedIndex.value = null
-    }, 2000)
+    setTimeout(() => { copiedIndex.value = null }, 2000)
   } catch (e) {
     console.error('Failed to copy:', e)
   }
 }
 
+async function copyUpdateCommand() {
+  try {
+    await navigator.clipboard.writeText('claude plugin update vibechampion@pabloprx-vibechampion')
+    copiedUpdate.value = true
+    setTimeout(() => { copiedUpdate.value = false }, 2000)
+  } catch (e) {
+    console.error('Failed to copy:', e)
+  }
+}
+
+// Sync with URL query params
+function updateUrlParams() {
+  const url = new URL(window.location.href)
+  url.searchParams.set('period', period.value)
+  url.searchParams.set('sortBy', sortBy.value)
+  window.history.replaceState({}, '', url.toString())
+}
+
+function loadFromUrlParams() {
+  const params = new URLSearchParams(window.location.search)
+  const urlPeriod = params.get('period')
+  const urlSortBy = params.get('sortBy')
+  if (urlPeriod && ['today', 'week', 'month', 'all'].includes(urlPeriod)) {
+    period.value = urlPeriod
+  }
+  if (urlSortBy && ['vibe_score', 'total_tokens', 'output_tokens', 'total_cost'].includes(urlSortBy)) {
+    sortBy.value = urlSortBy as SortMetric
+  }
+}
+
 watch([period, sortBy], () => {
   fetchLeaderboard()
+  updateUrlParams()
 })
 </script>
 
 <style>
-@import url('https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=Caveat:wght@500;600&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600;700&family=Space+Grotesk:wght@400;500;600;700&display=swap');
 
 :root {
-  --bg: #0c0c0c;
-  --panel: #141414;
-  --border: #252525;
-  --text: #e0e0e0;
-  --text-dim: #666;
+  --bg-deep: #050505;
+  --bg: #0a0a0a;
+  --bg-elevated: #111111;
+  --bg-hover: #1a1a1a;
+  --border: #1f1f1f;
+  --border-bright: #2a2a2a;
+  --text: #e8e8e8;
+  --text-secondary: #888;
+  --text-dim: #555;
   --accent: #4ade80;
-  --accent-soft: rgba(74, 222, 128, 0.1);
-  --accent-glow: rgba(74, 222, 128, 0.25);
+  --accent-dim: #22c55e;
+  --accent-soft: rgba(74, 222, 128, 0.08);
+  --accent-glow: rgba(74, 222, 128, 0.15);
+  --champion-bg: linear-gradient(135deg, rgba(74, 222, 128, 0.12) 0%, rgba(74, 222, 128, 0.04) 100%);
 }
 
 * {
@@ -368,29 +424,22 @@ watch([period, sortBy], () => {
 }
 
 html, body {
-  background: var(--bg);
+  background: var(--bg-deep);
   color: var(--text);
-  font-family: 'IBM Plex Mono', monospace;
-  font-size: 15px;
-  line-height: 1.6;
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 14px;
+  line-height: 1.5;
   min-height: 100vh;
+  -webkit-font-smoothing: antialiased;
 }
 
-/* CRT Effects - subtle */
+/* CRT Effects */
 .crt {
   position: relative;
   min-height: 100vh;
-  background: var(--bg);
-  overflow: hidden;
-}
-
-.crt::before {
-  content: '';
-  position: fixed;
-  inset: 0;
-  background: radial-gradient(ellipse at center, transparent 0%, rgba(0,0,0,0.15) 100%);
-  pointer-events: none;
-  z-index: 100;
+  background:
+    radial-gradient(ellipse at 50% 0%, rgba(74, 222, 128, 0.03) 0%, transparent 50%),
+    var(--bg-deep);
 }
 
 .scanline {
@@ -398,16 +447,15 @@ html, body {
   top: 0;
   left: 0;
   width: 100%;
-  height: 2px;
-  background: linear-gradient(to bottom, transparent, var(--accent-soft), transparent);
-  animation: scanline 12s linear infinite;
+  height: 3px;
+  background: linear-gradient(to bottom, transparent, rgba(74, 222, 128, 0.06), transparent);
+  animation: scanline 8s linear infinite;
   pointer-events: none;
-  z-index: 101;
-  opacity: 0.4;
+  z-index: 1000;
 }
 
 @keyframes scanline {
-  0% { top: -2px; }
+  0% { top: -3px; }
   100% { top: 100%; }
 }
 
@@ -415,24 +463,18 @@ html, body {
   position: fixed;
   inset: 0;
   pointer-events: none;
-  opacity: 0.015;
-  background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
-  z-index: 99;
-}
-
-.flicker {
-  display: none;
+  opacity: 0.02;
+  background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.8' numOctaves='4'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+  z-index: 999;
 }
 
 .screen {
   position: relative;
   z-index: 1;
-  max-width: 960px;
+  max-width: 1200px;
   margin: 0 auto;
-  padding: 2.5rem;
+  padding: 2rem;
   min-height: 100vh;
-  display: flex;
-  flex-direction: column;
 }
 
 /* Header */
@@ -441,19 +483,57 @@ html, body {
   justify-content: space-between;
   align-items: center;
   padding-bottom: 2rem;
+  border-bottom: 1px solid var(--border);
   margin-bottom: 2rem;
 }
 
 .logo {
   display: flex;
-  align-items: baseline;
+  align-items: center;
   gap: 0.75rem;
 }
 
+.mascot {
+  width: 48px;
+  height: 48px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.mascot-svg {
+  width: 100%;
+  height: 100%;
+  color: var(--accent);
+}
+
+.mascot-body {
+  filter: drop-shadow(0 0 8px var(--accent-glow));
+}
+
+.sparkle {
+  animation: twinkle 2s ease-in-out infinite;
+}
+
+.sparkle.s1 { animation-delay: 0s; }
+.sparkle.s2 { animation-delay: 0.5s; }
+.sparkle.s3 { animation-delay: 1s; }
+
+@keyframes twinkle {
+  0%, 100% { opacity: 1; transform: scale(1); }
+  50% { opacity: 0.3; transform: scale(0.8); }
+}
+
+@keyframes pulse {
+  0%, 100% { opacity: 1; transform: scale(1); }
+  50% { opacity: 0.7; transform: scale(0.95); }
+}
+
 .logo-text {
+  font-family: 'Space Grotesk', sans-serif;
   font-size: 1.5rem;
-  font-weight: 600;
-  letter-spacing: 1px;
+  font-weight: 700;
+  letter-spacing: -0.5px;
   color: var(--text);
 }
 
@@ -461,550 +541,623 @@ html, body {
   color: var(--accent);
 }
 
-.logo-version {
-  font-size: 0.75rem;
-  color: var(--text-dim);
-}
-
 .status {
   display: flex;
   align-items: center;
   gap: 0.5rem;
-  font-size: 0.8rem;
+  font-size: 0.75rem;
   color: var(--accent);
-}
-
-.status-dot {
-  width: 8px;
-  height: 8px;
-  background: var(--accent);
-  border-radius: 50%;
-  animation: pulse 2s ease-in-out infinite;
-}
-
-@keyframes pulse {
-  0%, 100% { opacity: 1; }
-  50% { opacity: 0.4; }
-}
-
-/* Grid - rankings panel is wider */
-.grid {
-  display: grid;
-  grid-template-columns: 1fr 1.4fr;
-  gap: 2rem;
-  flex: 1;
-}
-
-/* Panels */
-.panel {
-  background: var(--panel);
-  border-radius: 8px;
-  display: flex;
-  flex-direction: column;
-}
-
-.rankings-panel {
-  overflow: visible;
-}
-
-.panel-header {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  padding: 1rem 1.25rem;
-  border-bottom: 1px solid var(--border);
-}
-
-.comment {
-  font-size: 0.9rem;
-  color: var(--accent);
+  text-transform: uppercase;
   letter-spacing: 1px;
 }
 
-.panel-content {
-  flex: 1;
-  padding: 1.25rem;
-}
-
-.panel-footer {
-  padding: 0.75rem 1.25rem;
-  border-top: 1px solid var(--border);
-  font-size: 0.75rem;
-  color: var(--text-dim);
-  display: flex;
-  gap: 0.5rem;
-}
-
-.separator {
-  opacity: 0.3;
-}
-
-/* Terminal */
-.terminal {
-  display: flex;
-  flex-direction: column;
-  gap: 0.75rem;
-}
-
-.terminal-line {
-  display: flex;
-  align-items: center;
-  gap: 0.75rem;
-  padding: 0.875rem 1rem;
-  background: var(--bg);
-  border-radius: 6px;
-  cursor: pointer;
-  transition: all 0.2s ease;
-}
-
-.terminal-line:hover {
-  background: var(--accent-soft);
-}
-
-.prompt {
-  color: var(--accent);
-}
-
-.terminal-line code {
-  flex: 1;
-  font-size: 0.8rem;
-  color: var(--text-dim);
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.terminal-line:hover code {
-  color: var(--text);
-}
-
-.cursor {
-  color: var(--accent);
-  animation: blink 1s step-end infinite;
+.status-dot {
+  width: 6px;
+  height: 6px;
+  background: var(--accent);
+  border-radius: 50%;
+  box-shadow: 0 0 8px var(--accent);
+  animation: blink 2s ease-in-out infinite;
 }
 
 @keyframes blink {
-  50% { opacity: 0; }
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.3; }
 }
 
-.copied-badge {
-  font-size: 0.75rem;
-  color: var(--accent);
-  font-weight: 500;
+/* Main Layout */
+.main {
+  display: grid;
+  grid-template-columns: 1fr 300px;
+  gap: 2rem;
+  align-items: start;
 }
 
-.terminal-hint {
-  margin-top: 1.25rem;
+/* Rankings Section */
+.rankings-section {
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  overflow: hidden;
+}
+
+.section-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 1.25rem 1.5rem;
+  background: var(--bg-elevated);
+  border-bottom: 1px solid var(--border);
+  flex-wrap: wrap;
+  gap: 1rem;
+}
+
+.section-title {
+  font-family: 'Space Grotesk', sans-serif;
   font-size: 0.9rem;
-  color: var(--text-dim);
-}
-
-.terminal-hint .blink {
-  color: var(--accent);
-  animation: blink 1s step-end infinite;
-}
-
-.highlight {
-  color: var(--accent);
-}
-
-/* Update notice */
-.update-notice {
-  margin-top: 1.5rem;
-  padding-top: 1.5rem;
-  border-top: 1px dashed var(--border);
-}
-
-.update-header {
+  font-weight: 600;
+  letter-spacing: 2px;
+  color: var(--text);
   display: flex;
   align-items: center;
   gap: 0.5rem;
-  margin-bottom: 0.5rem;
 }
 
-.update-badge {
-  background: var(--accent);
-  color: var(--bg);
-  font-size: 0.65rem;
-  font-weight: 600;
-  padding: 0.15rem 0.4rem;
-  border-radius: 3px;
-  letter-spacing: 0.5px;
+.title-decorator {
+  color: var(--accent);
+  font-family: 'JetBrains Mono', monospace;
 }
 
-.update-title {
-  font-size: 0.85rem;
-  color: var(--text);
-  font-weight: 500;
+.controls {
+  display: flex;
+  gap: 1.5rem;
+  flex-wrap: wrap;
 }
 
-.update-desc {
-  font-size: 0.8rem;
-  color: var(--text-dim);
-  margin-bottom: 0.75rem;
-}
-
-.update-cmd {
+.control-group {
   display: flex;
   align-items: center;
   gap: 0.75rem;
-  padding: 0.75rem 1rem;
-  background: var(--bg);
+}
+
+.control-label {
+  font-size: 0.65rem;
+  color: var(--text-dim);
+  text-transform: uppercase;
+  letter-spacing: 1px;
+}
+
+.segmented {
+  display: flex;
+  background: var(--bg-deep);
+  border: 1px solid var(--border);
   border-radius: 6px;
-  cursor: pointer;
-  transition: all 0.2s ease;
-  margin-bottom: 0.75rem;
+  padding: 3px;
+  gap: 2px;
 }
 
-.update-cmd:hover {
-  background: var(--accent-soft);
-}
-
-.update-cmd code {
-  font-size: 0.75rem;
-  color: var(--text-dim);
-  flex: 1;
-}
-
-.update-cmd:hover code {
-  color: var(--text);
-}
-
-.update-link {
-  font-size: 0.75rem;
-}
-
-.update-link a {
-  color: var(--text-dim);
-  text-decoration: none;
-  transition: color 0.2s ease;
-}
-
-.update-link a:hover {
-  color: var(--accent);
-}
-
-.update-link .arrow {
-  display: inline-block;
-  transition: transform 0.2s ease;
-}
-
-.update-link a:hover .arrow {
-  transform: translateX(3px);
-}
-
-/* Filter row */
-.filter-row {
-  display: flex;
-  gap: 1rem;
-  align-items: center;
-}
-
-/* Period tabs */
-.period-tabs,
-.metric-tabs {
-  display: flex;
-  gap: 0.25rem;
-}
-
-.period-tabs button,
-.metric-tabs button {
+.segmented button {
   background: transparent;
   border: none;
-  color: var(--text-dim);
+  color: var(--text-secondary);
   font-family: inherit;
-  font-size: 0.75rem;
+  font-size: 0.7rem;
+  font-weight: 500;
   padding: 0.4rem 0.75rem;
   border-radius: 4px;
   cursor: pointer;
   transition: all 0.15s ease;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
 }
 
-.period-tabs button:hover,
-.metric-tabs button:hover {
+.segmented button:hover {
   color: var(--text);
-  background: var(--border);
+  background: var(--bg-hover);
 }
 
-.period-tabs button.active,
-.metric-tabs button.active {
-  color: var(--accent);
-  background: var(--accent-soft);
+.segmented button.active {
+  color: var(--bg-deep);
+  background: var(--accent);
+  font-weight: 600;
 }
 
-.metric-tabs {
-  border-right: 1px solid var(--border);
-  padding-right: 1rem;
+/* Rankings Table */
+.rankings-container {
+  min-height: 300px;
 }
 
-/* Rankings */
-.rankings {
-  display: flex;
-  flex-direction: column;
-  position: relative;
+.rankings-table {
+  width: 100%;
 }
 
-.rankings-header {
+.table-header {
   display: grid;
-  grid-template-columns: 2.5rem 1fr auto;
-  gap: 0.75rem;
-  padding: 0.5rem 1rem;
-  font-size: 0.7rem;
-  color: var(--text-dim);
+  grid-template-columns: 80px 1fr 120px;
+  padding: 0.75rem 1.5rem;
+  background: var(--bg-elevated);
+  border-bottom: 1px solid var(--border);
+  font-size: 0.65rem;
+  font-weight: 600;
   text-transform: uppercase;
   letter-spacing: 1px;
-  border-bottom: 1px solid var(--border);
+  color: var(--text-dim);
 }
 
-.rankings-header .col-metric {
-  text-align: right;
-  min-width: 5rem;
-}
-
-.rankings-body {
+.table-body {
   display: flex;
   flex-direction: column;
 }
 
-.ranking-row {
+.table-row {
   display: grid;
-  grid-template-columns: 2.5rem 1fr auto;
-  gap: 0.75rem;
-  padding: 1rem;
-  font-size: 0.95rem;
+  grid-template-columns: 80px 1fr 120px;
+  padding: 1rem 1.5rem;
+  align-items: center;
   border-bottom: 1px solid var(--border);
   transition: all 0.15s ease;
-  align-items: center;
 }
 
-.ranking-row:last-child {
+.table-row:last-child {
   border-bottom: none;
 }
 
-.ranking-row:hover {
-  background: var(--accent-soft);
+.table-row:hover {
+  background: var(--bg-hover);
 }
 
-.ranking-row.champion {
-  background: var(--accent-soft);
+.table-row.is-champion {
+  background: var(--champion-bg);
+  border-left: 3px solid var(--accent);
+  padding-left: calc(1.5rem - 3px);
+}
+
+.table-row.is-champion:hover {
+  background: var(--champion-bg);
+}
+
+.td-rank {
+  font-weight: 600;
+  color: var(--text-secondary);
+}
+
+.table-row.is-top3 .rank-num {
+  color: var(--accent);
+}
+
+.champion-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  background: var(--accent);
+  border-radius: 8px;
+  box-shadow: 0 0 20px var(--accent-glow);
+}
+
+.crown-icon {
+  color: var(--bg-deep);
+  font-size: 1rem;
+}
+
+.td-user {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+}
+
+.user-name {
+  font-weight: 600;
+  color: var(--text);
+  font-size: 1rem;
+}
+
+.table-row.is-champion .user-name {
+  color: var(--accent);
   font-size: 1.1rem;
 }
 
-.ranking-row.champion .col-name,
-.ranking-row.champion .col-rank {
-  color: var(--accent);
-  font-weight: 600;
-}
-
-.ranking-row.champion .col-metric {
-  color: var(--accent);
-  font-weight: 600;
-}
-
-.ranking-row.top-3:not(.champion) .col-rank {
-  color: var(--accent);
-}
-
-.col-rank {
-  text-align: center;
-  font-weight: 500;
-}
-
-.crown {
-  color: var(--accent);
-  font-size: 1.2rem;
-}
-
-.col-name {
-  font-weight: 500;
-}
-
-.col-metric {
-  text-align: right;
-  min-width: 5rem;
-  font-family: 'IBM Plex Mono', monospace;
-}
-
-.metric-value {
+.roast {
+  font-size: 0.75rem;
   color: var(--text-dim);
-  font-size: 0.85rem;
+  font-style: italic;
 }
 
-/* Floating roasts - handwritten style */
-.floating-roasts {
-  position: absolute;
-  right: -220px;
-  top: 0;
-  width: 200px;
-  pointer-events: none;
+.td-score {
+  font-family: 'JetBrains Mono', monospace;
+  font-weight: 600;
+  font-size: 1rem;
+  color: var(--text-secondary);
+  text-align: right;
 }
 
-.floating-roast {
-  font-family: 'Caveat', cursive;
-  font-size: 1.1rem;
+.table-row.is-champion .td-score {
   color: var(--accent);
-  white-space: nowrap;
-  transform: rotate(-2deg);
-  padding: 0.5rem 0;
-  opacity: 0.85;
+  font-size: 1.1rem;
 }
 
-.roast-0 {
-  margin-top: 0.5rem;
-  transform: rotate(-3deg);
+/* Rankings Footer */
+.rankings-footer {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 1rem 1.5rem;
+  background: var(--bg-elevated);
+  border-top: 1px solid var(--border);
+  font-size: 0.75rem;
+  color: var(--text-dim);
 }
 
-.roast-1 {
-  margin-top: 1.5rem;
-  transform: rotate(1deg);
+.sync-info {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
 }
 
-.roast-2 {
-  margin-top: 1.5rem;
-  transform: rotate(-2deg);
+.sync-dot {
+  width: 6px;
+  height: 6px;
+  background: var(--accent);
+  border-radius: 50%;
+  animation: blink 2s ease-in-out infinite;
 }
 
-.roast-arrow {
-  display: inline-block;
-  margin-right: 0.25rem;
-}
-
-/* Loading */
+/* Loading State */
 .loading-state {
   display: flex;
   flex-direction: column;
   align-items: center;
   justify-content: center;
+  padding: 4rem;
   gap: 1rem;
-  padding: 3rem;
 }
 
 .loading-bar {
-  width: 120px;
-  height: 2px;
+  width: 150px;
+  height: 3px;
   background: var(--border);
-  position: relative;
+  border-radius: 2px;
   overflow: hidden;
-  border-radius: 1px;
+  position: relative;
 }
 
 .loading-bar::after {
   content: '';
   position: absolute;
-  left: -40%;
-  width: 40%;
+  left: -50%;
+  width: 50%;
   height: 100%;
   background: var(--accent);
   animation: loading 1s ease-in-out infinite;
 }
 
 @keyframes loading {
-  0% { left: -40%; }
+  0% { left: -50%; }
   100% { left: 100%; }
 }
 
 .loading-text {
-  font-size: 0.8rem;
+  font-size: 0.75rem;
   color: var(--text-dim);
+  text-transform: uppercase;
   letter-spacing: 2px;
 }
 
-/* Empty state */
+/* Empty State */
 .empty-state {
   display: flex;
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  padding: 3rem;
-  gap: 0.75rem;
+  padding: 4rem;
+  gap: 0.5rem;
 }
 
-.glitch {
-  font-size: 1.25rem;
-  color: var(--accent);
-  letter-spacing: 4px;
+.empty-icon {
+  font-size: 2rem;
+  color: var(--text-dim);
+  margin-bottom: 0.5rem;
+}
+
+.empty-title {
+  font-size: 0.9rem;
+  color: var(--text);
+  font-weight: 600;
+  letter-spacing: 1px;
 }
 
 .empty-sub {
-  font-size: 0.85rem;
+  font-size: 0.8rem;
   color: var(--text-dim);
 }
 
-/* Footer */
-.footer {
-  padding-top: 2rem;
-  text-align: center;
+/* Install Sidebar */
+.install-sidebar {
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  overflow: hidden;
+  position: sticky;
+  top: 2rem;
 }
 
-.footer a {
-  color: var(--text-dim);
-  text-decoration: none;
-  font-size: 0.85rem;
+.sidebar-header {
+  padding: 1rem 1.25rem;
+  background: var(--bg-elevated);
+  border-bottom: 1px solid var(--border);
+}
+
+.sidebar-title {
+  font-size: 0.75rem;
+  color: var(--accent);
+  text-transform: uppercase;
   letter-spacing: 1px;
-  transition: all 0.2s ease;
 }
 
-.footer a:hover {
+.sidebar-content {
+  padding: 1.25rem;
+}
+
+.install-steps {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+
+.step {
+  display: flex;
+  gap: 0.75rem;
+}
+
+.step-num {
+  width: 24px;
+  height: 24px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--bg-elevated);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  font-size: 0.7rem;
+  font-weight: 600;
+  color: var(--text-secondary);
+  flex-shrink: 0;
+}
+
+.step-content {
+  flex: 1;
+  min-width: 0;
+}
+
+.step-label {
+  display: block;
+  font-size: 0.7rem;
+  color: var(--text-dim);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  margin-bottom: 0.4rem;
+}
+
+.cmd {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+  background: var(--bg-deep);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 0.5rem 0.75rem;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.cmd:hover {
+  border-color: var(--border-bright);
+  background: var(--bg-elevated);
+}
+
+.cmd code {
+  font-size: 0.7rem;
+  color: var(--text-secondary);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.cmd:hover code {
+  color: var(--text);
+}
+
+.cmd-action {
+  font-size: 0.6rem;
+  font-weight: 600;
+  color: var(--accent);
+  flex-shrink: 0;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.cmd.highlight {
+  background: var(--accent-soft);
+  border-color: var(--accent-dim);
+}
+
+.cmd.highlight code {
+  color: var(--accent);
+  font-weight: 600;
+}
+
+/* Update Banner */
+.update-banner {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  margin-top: 1.5rem;
+  padding: 0.75rem;
+  background: var(--bg-elevated);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+}
+
+.update-badge {
+  background: var(--accent);
+  color: var(--bg-deep);
+  font-size: 0.6rem;
+  font-weight: 700;
+  padding: 0.2rem 0.4rem;
+  border-radius: 4px;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.update-info {
+  display: flex;
+  flex-direction: column;
+  gap: 0.1rem;
+}
+
+.update-title {
+  font-size: 0.75rem;
+  color: var(--text);
+  font-weight: 500;
+}
+
+.update-desc {
+  font-size: 0.65rem;
+  color: var(--text-dim);
+}
+
+.update-cmd {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+  background: var(--bg-deep);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 0.5rem 0.75rem;
+  margin-top: 0.75rem;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.update-cmd:hover {
+  border-color: var(--accent-dim);
+  background: var(--bg-elevated);
+}
+
+.update-cmd code {
+  font-size: 0.65rem;
+  color: var(--text-secondary);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.update-cmd:hover code {
+  color: var(--text);
+}
+
+/* Links */
+.links {
+  margin-top: 1rem;
+  padding-top: 1rem;
+  border-top: 1px solid var(--border);
+}
+
+.link {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  color: var(--text-secondary);
+  text-decoration: none;
+  font-size: 0.75rem;
+  padding: 0.5rem 0;
+  transition: color 0.15s ease;
+}
+
+.link:hover {
   color: var(--accent);
 }
 
-.bracket {
+.link-icon {
   color: var(--accent);
 }
 
 /* Mobile */
-@media (max-width: 1100px) {
-  .floating-roasts {
-    display: none;
-  }
-}
-
 @media (max-width: 900px) {
-  .panel-header {
+  .main {
+    grid-template-columns: 1fr;
+  }
+
+  .install-sidebar {
+    position: static;
+    order: 2;
+  }
+
+  .section-header {
     flex-direction: column;
     align-items: flex-start;
-    gap: 0.75rem;
   }
 
-  .filter-row {
+  .controls {
+    width: 100%;
+    flex-direction: column;
+    gap: 1rem;
+  }
+
+  .control-group {
+    width: 100%;
     flex-direction: column;
     align-items: flex-start;
     gap: 0.5rem;
   }
 
-  .metric-tabs {
-    border-right: none;
-    padding-right: 0;
-    border-bottom: 1px solid var(--border);
-    padding-bottom: 0.5rem;
+  .segmented {
+    width: 100%;
+    justify-content: stretch;
+  }
+
+  .segmented button {
+    flex: 1;
+    text-align: center;
+  }
+
+  .table-header,
+  .table-row {
+    grid-template-columns: 60px 1fr 80px;
+    padding: 0.75rem 1rem;
+  }
+
+  .user-name {
+    font-size: 0.9rem;
+  }
+
+  .td-score {
+    font-size: 0.85rem;
   }
 }
 
-@media (max-width: 800px) {
+@media (max-width: 500px) {
   .screen {
-    padding: 1.5rem;
-  }
-
-  .grid {
-    grid-template-columns: 1fr;
+    padding: 1rem;
   }
 
   .header {
     flex-direction: column;
-    gap: 1rem;
     align-items: flex-start;
+    gap: 1rem;
   }
 
-  .terminal-line code {
-    font-size: 0.7rem;
+  .table-header,
+  .table-row {
+    grid-template-columns: 50px 1fr 70px;
+    padding: 0.5rem 0.75rem;
   }
 
-  .ranking-row {
-    font-size: 0.85rem;
-  }
-
-  .ranking-row.champion {
-    font-size: 0.95rem;
+  .roast {
+    display: none;
   }
 }
 </style>
