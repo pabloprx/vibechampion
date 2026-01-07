@@ -219,12 +219,13 @@ export function getPeriodDates(period: Period): { since: string; until: string; 
 
 export async function getLeaderboard(
   period: Period = 'month',
-  sortBy: SortMetric = 'vibe_score'
+  sortBy: SortMetric = 'total_tokens'
 ): Promise<{ period: string; sortBy: SortMetric; leaderboard: LeaderboardEntry[] }> {
   const client = getDb()
   const { since, label } = getPeriodDates(period)
 
-  // vibe_score = output + input + cache_creation (excludes cache_read - it's just loading context)
+  // vibe_score = weighted efficiency score: (output*2 + input + tokens) / cost
+  // Higher = more value per dollar spent. Rewards both output AND efficiency.
   const result = await client.execute({
     sql: `
       SELECT
@@ -234,13 +235,16 @@ export async function getLeaderboard(
         COALESCE(SUM(ds.input_tokens), 0) as input_tokens,
         COALESCE(SUM(ds.cache_read_tokens), 0) as cache_read_tokens,
         COALESCE(SUM(ds.cache_creation_tokens), 0) as cache_creation_tokens,
-        COALESCE(SUM(ds.output_tokens) + SUM(ds.input_tokens) + SUM(ds.cache_creation_tokens), 0) as vibe_score,
+        CAST(
+          (COALESCE(SUM(ds.output_tokens), 0) * 2 + COALESCE(SUM(ds.input_tokens), 0) + COALESCE(SUM(ds.total_tokens), 0))
+          / MAX(COALESCE(SUM(ds.total_cost), 0.01), 0.01)
+        AS INTEGER) as vibe_score,
         COALESCE(SUM(ds.total_cost), 0) as total_cost,
         COUNT(DISTINCT ds.date) as days_active
       FROM users u
       LEFT JOIN daily_stats ds ON u.id = ds.user_id AND ds.date >= ?
       GROUP BY u.id, u.name
-      HAVING vibe_score > 0 OR total_tokens > 0
+      HAVING total_tokens > 0
       ORDER BY ${sortBy} DESC
     `,
     args: [since]

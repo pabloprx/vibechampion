@@ -6,7 +6,7 @@ const validMetrics: SortMetric[] = ['vibe_score', 'total_tokens', 'output_tokens
 export default defineEventHandler(async (event) => {
   const query = getQuery(event)
   let period = (query.period as Period) || 'month'
-  let sortBy = (query.sortBy as SortMetric) || 'vibe_score'
+  let sortBy = (query.sortBy as SortMetric) || 'total_tokens'
 
   if (!validPeriods.includes(period)) {
     period = 'month'

@@ -81,34 +81,34 @@
                   <span class="th-bar"></span>
                   <span class="th-score">{{ getMetricLabel() }}</span>
                 </div>
-                <div class="table-body" :class="{ 'is-shuffling': isShuffling }">
+                <div class="table-body">
                   <div
                     v-for="(entry, index) in displayData"
                     :key="entry.name"
                     class="table-row"
                     :class="{
-                      'is-champion': index === 0 && !isShuffling,
+                      'is-champion': index === 0,
                       'is-top3': index < 3,
                       'is-even': index % 2 === 0
                     }"
-                    @mouseenter="index === 0 && !isShuffling && handleWinnerHover(true)"
-                    @mouseleave="index === 0 && !isShuffling && handleWinnerHover(false)"
+                    @mouseenter="index === 0 && handleWinnerHover(true)"
+                    @mouseleave="index === 0 && handleWinnerHover(false)"
                   >
                     <span class="td-rank">
-                      <span v-if="index === 0 && !isShuffling" class="champion-badge">
+                      <span v-if="index === 0" class="champion-badge">
                         <span class="crown-icon">&#9733;</span>
                       </span>
                       <span v-else class="rank-num">{{ index + 1 }}</span>
                     </span>
                     <span class="td-user">
                       <span class="user-name">{{ entry.name }}</span>
-                      <span v-if="index < 3 && !isShuffling" class="roast">{{ getRandomRoast(entry.name) }}</span>
+                      <span v-if="index < 3" class="roast">{{ getRandomRoast(entry.name) }}</span>
                     </span>
                     <span class="td-bar">
                       <div class="bar-track">
                         <div
                           class="bar-fill"
-                          :style="{ width: (isShuffling ? 50 + Math.random() * 50 : getScorePercent(entry)) + '%' }"
+                          :style="{ width: getScorePercent(entry) + '%' }"
                         ></div>
                       </div>
                     </span>
@@ -223,13 +223,11 @@ type SortMetric = 'vibe_score' | 'total_tokens' | 'output_tokens' | 'total_cost'
 const loading = ref(false)
 const leaderboardData = ref<LeaderboardResponse | null>(null)
 const displayData = ref<LeaderboardEntry[]>([])
-const isShuffling = ref(false)
 const period = ref('month')
-const sortBy = ref<SortMetric>('vibe_score')
+const sortBy = ref<SortMetric>('total_tokens')
 const copiedIndex = ref<number | null>(null)
 const copiedUpdate = ref(false)
 const hoveredWinner = ref(false)
-const hasAnimated = ref(false)
 
 const periods = [
   { label: 'DAY', value: 'today' },
@@ -278,29 +276,6 @@ function getNumericScore(entry: LeaderboardEntry): number {
   }
 }
 
-async function shuffleAnimation(data: LeaderboardEntry[]) {
-  if (data.length < 2 || hasAnimated.value) {
-    displayData.value = data
-    return
-  }
-
-  hasAnimated.value = true
-  isShuffling.value = true
-
-  // Create shuffled versions
-  const shuffles = 6
-  const intervalMs = 300
-
-  for (let i = 0; i < shuffles; i++) {
-    const shuffled = [...data].sort(() => Math.random() - 0.5)
-    displayData.value = shuffled
-    await new Promise(r => setTimeout(r, intervalMs))
-  }
-
-  // Final reveal - settle to real order
-  displayData.value = data
-  isShuffling.value = false
-}
 
 const commands = [
   'claude plugin marketplace add pabloprx/vibechampion',
@@ -349,9 +324,9 @@ function handleVisibilityChange() {
 
 onMounted(() => {
   loadFromUrlParams()
-  fetchLeaderboard(true) // animate on first load
+  fetchLeaderboard()
   loadConfetti()
-  refetchInterval = setInterval(() => fetchLeaderboard(false), REFETCH_INTERVAL)
+  refetchInterval = setInterval(fetchLeaderboard, REFETCH_INTERVAL)
   document.addEventListener('visibilitychange', handleVisibilityChange)
 })
 
@@ -360,15 +335,12 @@ onUnmounted(() => {
   document.removeEventListener('visibilitychange', handleVisibilityChange)
 })
 
-async function fetchLeaderboard(animate = false) {
+async function fetchLeaderboard() {
   loading.value = true
   try {
     const res = await fetch(`/api/leaderboard?period=${period.value}&sortBy=${sortBy.value}`)
     leaderboardData.value = await res.json()
-
-    if (animate && leaderboardData.value?.leaderboard) {
-      await shuffleAnimation(leaderboardData.value.leaderboard)
-    } else if (leaderboardData.value?.leaderboard) {
+    if (leaderboardData.value?.leaderboard) {
       displayData.value = leaderboardData.value.leaderboard
     }
   } catch (e) {
@@ -747,15 +719,6 @@ html, body {
   flex-direction: column;
 }
 
-.table-body.is-shuffling .table-row {
-  animation: rowPulse 0.3s ease-in-out;
-}
-
-@keyframes rowPulse {
-  0%, 100% { opacity: 1; }
-  50% { opacity: 0.7; }
-}
-
 .table-row {
   display: grid;
   grid-template-columns: 70px 1fr 200px 100px;
@@ -868,10 +831,6 @@ html, body {
 
 .table-row.is-champion .bar-fill {
   box-shadow: 0 0 12px var(--accent-glow), 0 0 20px var(--accent-glow);
-}
-
-.is-shuffling .bar-fill {
-  transition: none;
 }
 
 /* Rankings Footer */
