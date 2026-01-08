@@ -38,7 +38,26 @@ export async function initDb(): Promise<void> {
       UNIQUE(user_id, date)
     )`,
     `CREATE INDEX IF NOT EXISTS idx_daily_stats_date ON daily_stats(date)`,
-    `CREATE INDEX IF NOT EXISTS idx_daily_stats_user_date ON daily_stats(user_id, date)`
+    `CREATE INDEX IF NOT EXISTS idx_daily_stats_user_date ON daily_stats(user_id, date)`,
+    // Teams tables
+    `CREATE TABLE IF NOT EXISTS teams (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      code TEXT UNIQUE NOT NULL,
+      name TEXT NOT NULL,
+      image_url TEXT,
+      created_at TEXT DEFAULT (datetime('now'))
+    )`,
+    `CREATE TABLE IF NOT EXISTS user_teams (
+      user_id INTEGER NOT NULL,
+      team_id INTEGER NOT NULL,
+      visibility TEXT DEFAULT 'both',
+      joined_at TEXT DEFAULT (datetime('now')),
+      PRIMARY KEY (user_id, team_id),
+      FOREIGN KEY (user_id) REFERENCES users(id),
+      FOREIGN KEY (team_id) REFERENCES teams(id)
+    )`,
+    `CREATE INDEX IF NOT EXISTS idx_user_teams_user ON user_teams(user_id)`,
+    `CREATE INDEX IF NOT EXISTS idx_user_teams_team ON user_teams(team_id)`
   ])
 }
 
@@ -71,6 +90,29 @@ export interface StatsPayload {
   totalTokens?: number
   totalCost?: number
   modelsUsed?: string[]
+}
+
+// Teams
+export type Visibility = 'public' | 'team' | 'both'
+
+export interface Team {
+  id: number
+  code: string
+  name: string
+  image_url: string | null
+  created_at: string
+}
+
+export interface UserTeam {
+  user_id: number
+  team_id: number
+  visibility: Visibility
+  joined_at: string
+}
+
+export interface TeamWithMembership extends Team {
+  visibility: Visibility
+  member_count: number
 }
 
 // User operations
@@ -148,6 +190,153 @@ export async function bulkUpsertStats(userName: string, dailyStats: StatsPayload
   for (const s of dailyStats) {
     await upsertDailyStats(user.id, s)
   }
+}
+
+// Team operations
+export async function createTeam(code: string, name: string, imageUrl?: string): Promise<Team> {
+  const client = getDb()
+
+  // Check if team already exists
+  const existing = await client.execute({
+    sql: 'SELECT * FROM teams WHERE code = ?',
+    args: [code]
+  })
+
+  if (existing.rows.length > 0) {
+    return existing.rows[0] as unknown as Team
+  }
+
+  const result = await client.execute({
+    sql: 'INSERT INTO teams (code, name, image_url) VALUES (?, ?, ?)',
+    args: [code, name, imageUrl || null]
+  })
+
+  return {
+    id: Number(result.lastInsertRowid),
+    code,
+    name,
+    image_url: imageUrl || null,
+    created_at: new Date().toISOString()
+  }
+}
+
+export async function getTeamByCode(code: string): Promise<Team | null> {
+  const client = getDb()
+  const result = await client.execute({
+    sql: 'SELECT * FROM teams WHERE code = ?',
+    args: [code]
+  })
+  return result.rows[0] as unknown as Team | null
+}
+
+export async function updateTeam(code: string, updates: { name?: string; image_url?: string }): Promise<Team | null> {
+  const client = getDb()
+  const team = await getTeamByCode(code)
+  if (!team) return null
+
+  const newName = updates.name ?? team.name
+  const newImageUrl = updates.image_url ?? team.image_url
+
+  await client.execute({
+    sql: 'UPDATE teams SET name = ?, image_url = ? WHERE code = ?',
+    args: [newName, newImageUrl, code]
+  })
+
+  return { ...team, name: newName, image_url: newImageUrl }
+}
+
+export async function joinTeam(
+  userName: string,
+  teamCode: string,
+  visibility: Visibility = 'both'
+): Promise<{ user: User; team: Team; visibility: Visibility }> {
+  const client = getDb()
+  const user = await getOrCreateUser(userName)
+  const team = await getTeamByCode(teamCode)
+
+  if (!team) {
+    throw new Error(`Team with code "${teamCode}" not found`)
+  }
+
+  // Upsert user_teams
+  await client.execute({
+    sql: `
+      INSERT INTO user_teams (user_id, team_id, visibility)
+      VALUES (?, ?, ?)
+      ON CONFLICT(user_id, team_id) DO UPDATE SET visibility = excluded.visibility
+    `,
+    args: [user.id, team.id, visibility]
+  })
+
+  return { user, team, visibility }
+}
+
+export async function leaveTeam(userName: string, teamCode: string): Promise<boolean> {
+  const client = getDb()
+  const user = await getUser(userName)
+  const team = await getTeamByCode(teamCode)
+
+  if (!user || !team) return false
+
+  await client.execute({
+    sql: 'DELETE FROM user_teams WHERE user_id = ? AND team_id = ?',
+    args: [user.id, team.id]
+  })
+
+  return true
+}
+
+export async function getUserTeams(userName: string): Promise<TeamWithMembership[]> {
+  const client = getDb()
+  const user = await getUser(userName)
+  if (!user) return []
+
+  const result = await client.execute({
+    sql: `
+      SELECT
+        t.*,
+        ut.visibility,
+        (SELECT COUNT(*) FROM user_teams WHERE team_id = t.id) as member_count
+      FROM teams t
+      JOIN user_teams ut ON t.id = ut.team_id
+      WHERE ut.user_id = ?
+      ORDER BY t.name
+    `,
+    args: [user.id]
+  })
+
+  return result.rows as unknown as TeamWithMembership[]
+}
+
+export async function getTeamMembers(teamCode: string): Promise<{ name: string; visibility: Visibility; joined_at: string }[]> {
+  const client = getDb()
+  const team = await getTeamByCode(teamCode)
+  if (!team) return []
+
+  const result = await client.execute({
+    sql: `
+      SELECT u.name, ut.visibility, ut.joined_at
+      FROM users u
+      JOIN user_teams ut ON u.id = ut.user_id
+      WHERE ut.team_id = ?
+      ORDER BY ut.joined_at
+    `,
+    args: [team.id]
+  })
+
+  return result.rows as unknown as { name: string; visibility: Visibility; joined_at: string }[]
+}
+
+export async function getAllTeams(): Promise<(Team & { member_count: number })[]> {
+  const client = getDb()
+  const result = await client.execute(`
+    SELECT
+      t.*,
+      (SELECT COUNT(*) FROM user_teams WHERE team_id = t.id) as member_count
+    FROM teams t
+    ORDER BY member_count DESC, t.name
+  `)
+  return result.rows as unknown as (Team & { member_count: number })[]
 }
 
 // Archetypes based on usage patterns
@@ -333,10 +522,44 @@ export function getPeriodDates(period: Period): { since: string; until: string; 
 
 export async function getLeaderboard(
   period: Period = 'month',
-  sortBy: SortMetric = 'total_tokens'
-): Promise<{ period: string; sortBy: SortMetric; leaderboard: LeaderboardEntry[] }> {
+  sortBy: SortMetric = 'total_tokens',
+  teamCode?: string
+): Promise<{ period: string; sortBy: SortMetric; teamCode?: string; teamName?: string; leaderboard: LeaderboardEntry[] }> {
   const client = getDb()
   const { since, label } = getPeriodDates(period)
+
+  let teamName: string | undefined
+  let teamFilter = ''
+  let publicFilter = ''
+  const args: (string | number)[] = []
+
+  if (teamCode) {
+    // Team leaderboard: show members with visibility 'team' or 'both'
+    const team = await getTeamByCode(teamCode)
+    if (team) {
+      teamName = team.name
+      teamFilter = `
+        JOIN user_teams ut ON u.id = ut.user_id
+        JOIN teams t ON ut.team_id = t.id AND t.code = ?
+        AND ut.visibility IN ('team', 'both')
+      `
+      args.push(teamCode)
+    }
+  } else {
+    // Public leaderboard: exclude users who ONLY have 'team' visibility
+    // Show: users not in any team, or users with at least one 'public'/'both' membership
+    publicFilter = `
+      AND (
+        NOT EXISTS (SELECT 1 FROM user_teams ut2 WHERE ut2.user_id = u.id)
+        OR EXISTS (
+          SELECT 1 FROM user_teams ut3
+          WHERE ut3.user_id = u.id AND ut3.visibility IN ('public', 'both')
+        )
+      )
+    `
+  }
+
+  args.push(since)
 
   // vibe_score = weighted efficiency score: (output*2 + input + tokens) / cost
   // Higher = more value per dollar spent. Rewards both output AND efficiency.
@@ -356,12 +579,14 @@ export async function getLeaderboard(
         COALESCE(SUM(ds.total_cost), 0) as total_cost,
         COUNT(DISTINCT ds.date) as days_active
       FROM users u
+      ${teamFilter}
       LEFT JOIN daily_stats ds ON u.id = ds.user_id AND ds.date >= ?
+      WHERE 1=1 ${publicFilter}
       GROUP BY u.id, u.name
       HAVING total_tokens > 0
       ORDER BY ${sortBy} DESC
     `,
-    args: [since]
+    args
   })
 
   const rows = result.rows as unknown as Omit<LeaderboardEntry, 'rank' | 'archetype'>[]
@@ -369,6 +594,8 @@ export async function getLeaderboard(
   return {
     period: label,
     sortBy,
+    teamCode,
+    teamName,
     leaderboard: rows.map((r, i) => ({
       ...r,
       rank: i + 1,

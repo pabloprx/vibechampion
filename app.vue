@@ -38,6 +38,30 @@
               <span class="title-decorator">//</span> LEADERBOARD
             </h2>
             <div class="controls">
+              <!-- Team Selector -->
+              <div class="control-group team-control">
+                <span class="control-label">TEAM</span>
+                <div class="team-selector">
+                  <button
+                    :class="{ active: !currentTeam }"
+                    @click="selectTeam(null)"
+                  >
+                    PUBLIC
+                  </button>
+                  <button
+                    v-for="t in myTeams"
+                    :key="t.code"
+                    :class="{ active: currentTeam === t.code }"
+                    @click="selectTeam(t.code)"
+                    :title="t.name"
+                  >
+                    {{ t.name.substring(0, 8) }}
+                  </button>
+                  <button class="add-team-btn" @click="openAddTeamModal" title="Add Team">
+                    +
+                  </button>
+                </div>
+              </div>
               <div class="control-group">
                 <span class="control-label">RANK BY</span>
                 <div class="segmented">
@@ -204,6 +228,111 @@
           </div>
         </aside>
       </main>
+
+      <!-- Team Modal -->
+      <div v-if="showTeamModal" class="modal-overlay" @click.self="closeTeamModal">
+        <div class="modal">
+          <div class="modal-header">
+            <h3>{{ teamModalMode === 'create' ? 'Create Team' : 'Join Team' }}</h3>
+            <button class="modal-close" @click="closeTeamModal">&times;</button>
+          </div>
+          <div class="modal-body">
+            <div class="form-group">
+              <label>Team Code</label>
+              <input
+                v-model="pendingTeamCode"
+                type="text"
+                placeholder="e.g. ACME-2024"
+                :disabled="teamModalMode === 'join' && newTeamName"
+              />
+              <span class="form-hint">3-20 chars, alphanumeric and hyphens</span>
+            </div>
+
+            <div v-if="teamModalMode === 'create'" class="form-group">
+              <label>Team Name</label>
+              <input v-model="newTeamName" type="text" placeholder="e.g. Acme Corp" />
+            </div>
+
+            <div v-if="teamModalMode === 'create'" class="form-group">
+              <label>Image URL (optional)</label>
+              <input v-model="newTeamImageUrl" type="text" placeholder="https://..." />
+            </div>
+
+            <div v-if="teamModalMode === 'join'" class="team-preview">
+              <div v-if="newTeamName" class="team-info">
+                <img v-if="newTeamImageUrl" :src="newTeamImageUrl" class="team-logo" alt="" />
+                <div class="team-details">
+                  <span class="team-name">{{ newTeamName }}</span>
+                  <span class="team-code">{{ pendingTeamCode }}</span>
+                </div>
+              </div>
+            </div>
+
+            <div class="form-group">
+              <label>Visibility</label>
+              <div class="visibility-options">
+                <label class="radio-option">
+                  <input type="radio" v-model="newTeamVisibility" value="both" />
+                  <span>Public + Team</span>
+                </label>
+                <label class="radio-option">
+                  <input type="radio" v-model="newTeamVisibility" value="team" />
+                  <span>Team Only</span>
+                </label>
+                <label class="radio-option">
+                  <input type="radio" v-model="newTeamVisibility" value="public" />
+                  <span>Public Only</span>
+                </label>
+              </div>
+              <span class="form-hint">Control where your stats appear</span>
+            </div>
+
+            <div v-if="teamError" class="form-error">{{ teamError }}</div>
+          </div>
+          <div class="modal-footer">
+            <button class="btn-secondary" @click="closeTeamModal">Cancel</button>
+            <button
+              v-if="teamModalMode === 'create'"
+              class="btn-primary"
+              @click="createTeam"
+            >
+              Create Team
+            </button>
+            <button
+              v-else
+              class="btn-primary"
+              @click="joinTeam"
+            >
+              Join Team
+            </button>
+          </div>
+        </div>
+      </div>
+
+      <!-- Team Settings Panel -->
+      <div v-if="showTeamSettings" class="team-settings-overlay" @click.self="showTeamSettings = false">
+        <div class="team-settings">
+          <div class="settings-header">
+            <h3>My Teams</h3>
+            <button class="modal-close" @click="showTeamSettings = false">&times;</button>
+          </div>
+          <div class="settings-body">
+            <div v-if="myTeams.length === 0" class="empty-teams">
+              No teams yet. Add one to get started!
+            </div>
+            <div v-for="t in myTeams" :key="t.code" class="team-item">
+              <div class="team-item-info">
+                <span class="team-item-name">{{ t.name }}</span>
+                <span class="team-item-code">{{ t.code }}</span>
+              </div>
+              <button class="btn-danger-sm" @click="leaveTeam(t.code)">Leave</button>
+            </div>
+          </div>
+          <div class="settings-footer">
+            <button class="btn-primary" @click="openAddTeamModal">+ Add Team</button>
+          </div>
+        </div>
+      </div>
     </div>
   </div>
 </template>
@@ -275,10 +404,24 @@ interface LeaderboardEntry {
 interface LeaderboardResponse {
   period: string
   sortBy: string
+  teamCode?: string
+  teamName?: string
   leaderboard: LeaderboardEntry[]
 }
 
 type SortMetric = 'vibe_score' | 'total_tokens' | 'output_tokens' | 'total_cost'
+type Visibility = 'public' | 'team' | 'both'
+
+interface Team {
+  code: string
+  name: string
+  image_url?: string
+  member_count?: number
+}
+
+interface MyTeam extends Team {
+  visibility: Visibility
+}
 
 const loading = ref(false)
 const leaderboardData = ref<LeaderboardResponse | null>(null)
@@ -288,6 +431,18 @@ const sortBy = ref<SortMetric>('total_tokens')
 const copiedIndex = ref<number | null>(null)
 const copiedUpdate = ref(false)
 const hoveredWinner = ref(false)
+
+// Team state
+const currentTeam = ref<string | null>(null)
+const myTeams = ref<MyTeam[]>([])
+const showTeamModal = ref(false)
+const teamModalMode = ref<'create' | 'join'>('join')
+const pendingTeamCode = ref('')
+const newTeamName = ref('')
+const newTeamImageUrl = ref('')
+const newTeamVisibility = ref<Visibility>('both')
+const teamError = ref('')
+const showTeamSettings = ref(false)
 
 const periods = [
   { label: 'DAY', value: 'today' },
@@ -427,6 +582,159 @@ function getArchetypeIcon(archetype: Archetype): string {
   return icons[archetype] || icons['vibe-coder']
 }
 
+// Team functions
+const TEAMS_STORAGE_KEY = 'vibechampion_teams'
+
+function loadTeamsFromStorage() {
+  if (typeof window === 'undefined') return
+  try {
+    const stored = localStorage.getItem(TEAMS_STORAGE_KEY)
+    if (stored) {
+      myTeams.value = JSON.parse(stored)
+    }
+  } catch (e) {
+    console.error('Failed to load teams from storage:', e)
+  }
+}
+
+function saveTeamsToStorage() {
+  if (typeof window === 'undefined') return
+  try {
+    localStorage.setItem(TEAMS_STORAGE_KEY, JSON.stringify(myTeams.value))
+  } catch (e) {
+    console.error('Failed to save teams to storage:', e)
+  }
+}
+
+async function checkAndHandleTeamFromUrl(code: string) {
+  pendingTeamCode.value = code
+
+  // Check if already in my teams
+  const existing = myTeams.value.find(t => t.code === code)
+  if (existing) {
+    currentTeam.value = code
+    return
+  }
+
+  // Check if team exists in DB
+  try {
+    const res = await fetch(`/api/teams/${code}`)
+    if (res.ok) {
+      const team = await res.json()
+      teamModalMode.value = 'join'
+      newTeamName.value = team.name
+      newTeamImageUrl.value = team.image_url || ''
+      showTeamModal.value = true
+    } else if (res.status === 404) {
+      // Team doesn't exist - offer to create
+      teamModalMode.value = 'create'
+      newTeamName.value = ''
+      newTeamImageUrl.value = ''
+      showTeamModal.value = true
+    }
+  } catch (e) {
+    console.error('Failed to check team:', e)
+  }
+}
+
+async function createTeam() {
+  if (!pendingTeamCode.value || !newTeamName.value) {
+    teamError.value = 'Code and name are required'
+    return
+  }
+
+  try {
+    const res = await fetch('/api/teams', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        code: pendingTeamCode.value,
+        name: newTeamName.value,
+        image_url: newTeamImageUrl.value || undefined
+      })
+    })
+
+    if (!res.ok) {
+      const error = await res.json()
+      teamError.value = error.message || 'Failed to create team'
+      return
+    }
+
+    const team = await res.json()
+    myTeams.value.push({
+      ...team,
+      visibility: newTeamVisibility.value
+    })
+    saveTeamsToStorage()
+    currentTeam.value = team.code
+    closeTeamModal()
+    fetchLeaderboard()
+  } catch (e) {
+    teamError.value = 'Failed to create team'
+  }
+}
+
+async function joinTeam() {
+  if (!pendingTeamCode.value) return
+
+  try {
+    // For now we just add to local storage
+    // The actual join API would be called when submitting stats
+    const res = await fetch(`/api/teams/${pendingTeamCode.value}`)
+    if (!res.ok) {
+      teamError.value = 'Team not found'
+      return
+    }
+
+    const team = await res.json()
+    myTeams.value.push({
+      code: team.code,
+      name: team.name,
+      image_url: team.image_url,
+      visibility: newTeamVisibility.value
+    })
+    saveTeamsToStorage()
+    currentTeam.value = team.code
+    closeTeamModal()
+    fetchLeaderboard()
+  } catch (e) {
+    teamError.value = 'Failed to join team'
+  }
+}
+
+function leaveTeam(code: string) {
+  myTeams.value = myTeams.value.filter(t => t.code !== code)
+  saveTeamsToStorage()
+  if (currentTeam.value === code) {
+    currentTeam.value = null
+    fetchLeaderboard()
+  }
+}
+
+function closeTeamModal() {
+  showTeamModal.value = false
+  teamError.value = ''
+  pendingTeamCode.value = ''
+  newTeamName.value = ''
+  newTeamImageUrl.value = ''
+}
+
+function openAddTeamModal() {
+  teamModalMode.value = 'join'
+  pendingTeamCode.value = ''
+  newTeamName.value = ''
+  newTeamImageUrl.value = ''
+  teamError.value = ''
+  showTeamModal.value = true
+}
+
+function selectTeam(code: string | null) {
+  currentTeam.value = code
+  showTeamSettings.value = false
+  fetchLeaderboard()
+  updateUrlParams()
+}
+
 let refetchInterval: ReturnType<typeof setInterval> | null = null
 
 function handleVisibilityChange() {
@@ -436,6 +744,7 @@ function handleVisibilityChange() {
 }
 
 onMounted(() => {
+  loadTeamsFromStorage()
   loadFromUrlParams()
   fetchLeaderboard()
   loadConfetti()
@@ -451,7 +760,11 @@ onUnmounted(() => {
 async function fetchLeaderboard() {
   loading.value = true
   try {
-    const res = await fetch(`/api/leaderboard?period=${period.value}&sortBy=${sortBy.value}`)
+    let url = `/api/leaderboard?period=${period.value}&sortBy=${sortBy.value}`
+    if (currentTeam.value) {
+      url += `&team=${currentTeam.value}`
+    }
+    const res = await fetch(url)
     leaderboardData.value = await res.json()
     if (leaderboardData.value?.leaderboard) {
       displayData.value = leaderboardData.value.leaderboard
@@ -519,6 +832,11 @@ function updateUrlParams() {
   const url = new URL(window.location.href)
   url.searchParams.set('period', period.value)
   url.searchParams.set('sortBy', sortBy.value)
+  if (currentTeam.value) {
+    url.searchParams.set('team', currentTeam.value)
+  } else {
+    url.searchParams.delete('team')
+  }
   window.history.replaceState({}, '', url.toString())
 }
 
@@ -526,16 +844,25 @@ function loadFromUrlParams() {
   const params = new URLSearchParams(window.location.search)
   const urlPeriod = params.get('period')
   const urlSortBy = params.get('sortBy')
+  const urlTeam = params.get('team')
+
   if (urlPeriod && ['today', 'week', 'month', 'all'].includes(urlPeriod)) {
     period.value = urlPeriod
   }
   if (urlSortBy && ['vibe_score', 'total_tokens', 'output_tokens', 'total_cost'].includes(urlSortBy)) {
     sortBy.value = urlSortBy as SortMetric
   }
+  if (urlTeam) {
+    checkAndHandleTeamFromUrl(urlTeam)
+  }
 }
 
 watch([period, sortBy], () => {
   fetchLeaderboard()
+  updateUrlParams()
+})
+
+watch(currentTeam, () => {
   updateUrlParams()
 })
 </script>
@@ -1394,5 +1721,369 @@ html, body {
     width: 36px;
     height: 36px;
   }
+}
+
+/* Team Selector */
+.team-control {
+  min-width: 0;
+}
+
+.team-selector {
+  display: flex;
+  background: var(--bg-deep);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 3px;
+  gap: 2px;
+  flex-wrap: wrap;
+}
+
+.team-selector button {
+  background: transparent;
+  border: none;
+  color: var(--text-secondary);
+  font-family: inherit;
+  font-size: 0.7rem;
+  font-weight: 500;
+  padding: 0.4rem 0.75rem;
+  border-radius: 4px;
+  cursor: pointer;
+  transition: all 0.15s ease;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  white-space: nowrap;
+}
+
+.team-selector button:hover {
+  color: var(--text);
+  background: var(--bg-hover);
+}
+
+.team-selector button.active {
+  color: var(--bg-deep);
+  background: var(--accent);
+  font-weight: 600;
+}
+
+.add-team-btn {
+  color: var(--accent) !important;
+  font-size: 1rem !important;
+  padding: 0.3rem 0.6rem !important;
+}
+
+.add-team-btn:hover {
+  background: var(--accent-soft) !important;
+}
+
+/* Modal */
+.modal-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.8);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
+  padding: 1rem;
+}
+
+.modal {
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  width: 100%;
+  max-width: 400px;
+  max-height: 90vh;
+  overflow-y: auto;
+}
+
+.modal-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 1rem 1.25rem;
+  border-bottom: 1px solid var(--border);
+}
+
+.modal-header h3 {
+  font-family: 'Space Grotesk', sans-serif;
+  font-size: 1rem;
+  font-weight: 600;
+  color: var(--text);
+}
+
+.modal-close {
+  background: none;
+  border: none;
+  color: var(--text-secondary);
+  font-size: 1.5rem;
+  cursor: pointer;
+  padding: 0;
+  line-height: 1;
+}
+
+.modal-close:hover {
+  color: var(--text);
+}
+
+.modal-body {
+  padding: 1.25rem;
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+
+.modal-footer {
+  display: flex;
+  justify-content: flex-end;
+  gap: 0.75rem;
+  padding: 1rem 1.25rem;
+  border-top: 1px solid var(--border);
+}
+
+/* Form Elements */
+.form-group {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.form-group label {
+  font-size: 0.75rem;
+  font-weight: 500;
+  color: var(--text-secondary);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.form-group input {
+  background: var(--bg-deep);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 0.75rem 1rem;
+  font-family: inherit;
+  font-size: 0.9rem;
+  color: var(--text);
+  outline: none;
+  transition: border-color 0.15s ease;
+}
+
+.form-group input:focus {
+  border-color: var(--accent);
+}
+
+.form-group input:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.form-hint {
+  font-size: 0.7rem;
+  color: var(--text-dim);
+}
+
+.form-error {
+  color: #ef4444;
+  font-size: 0.8rem;
+  padding: 0.5rem;
+  background: rgba(239, 68, 68, 0.1);
+  border-radius: 4px;
+}
+
+/* Visibility Options */
+.visibility-options {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.radio-option {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  cursor: pointer;
+  font-size: 0.85rem;
+  color: var(--text-secondary);
+}
+
+.radio-option input {
+  accent-color: var(--accent);
+}
+
+.radio-option:hover {
+  color: var(--text);
+}
+
+/* Team Preview */
+.team-preview {
+  padding: 1rem;
+  background: var(--bg-elevated);
+  border-radius: 8px;
+  border: 1px solid var(--border);
+}
+
+.team-info {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+}
+
+.team-logo {
+  width: 40px;
+  height: 40px;
+  border-radius: 8px;
+  object-fit: cover;
+}
+
+.team-details {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+}
+
+.team-name {
+  font-weight: 600;
+  color: var(--text);
+}
+
+.team-code {
+  font-size: 0.75rem;
+  color: var(--text-dim);
+  font-family: 'JetBrains Mono', monospace;
+}
+
+/* Buttons */
+.btn-primary {
+  background: var(--accent);
+  color: var(--bg-deep);
+  border: none;
+  border-radius: 6px;
+  padding: 0.75rem 1.25rem;
+  font-family: inherit;
+  font-size: 0.85rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.btn-primary:hover {
+  filter: brightness(1.1);
+}
+
+.btn-secondary {
+  background: var(--bg-elevated);
+  color: var(--text);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 0.75rem 1.25rem;
+  font-family: inherit;
+  font-size: 0.85rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.btn-secondary:hover {
+  background: var(--bg-hover);
+  border-color: var(--border-bright);
+}
+
+.btn-danger-sm {
+  background: transparent;
+  color: #ef4444;
+  border: 1px solid #ef4444;
+  border-radius: 4px;
+  padding: 0.4rem 0.75rem;
+  font-family: inherit;
+  font-size: 0.7rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.btn-danger-sm:hover {
+  background: rgba(239, 68, 68, 0.1);
+}
+
+/* Team Settings Panel */
+.team-settings-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.6);
+  display: flex;
+  justify-content: flex-end;
+  z-index: 1000;
+}
+
+.team-settings {
+  background: var(--bg);
+  border-left: 1px solid var(--border);
+  width: 100%;
+  max-width: 320px;
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+}
+
+.settings-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 1rem 1.25rem;
+  border-bottom: 1px solid var(--border);
+}
+
+.settings-header h3 {
+  font-family: 'Space Grotesk', sans-serif;
+  font-size: 1rem;
+  font-weight: 600;
+  color: var(--text);
+}
+
+.settings-body {
+  flex: 1;
+  overflow-y: auto;
+  padding: 1rem;
+}
+
+.settings-footer {
+  padding: 1rem;
+  border-top: 1px solid var(--border);
+}
+
+.empty-teams {
+  text-align: center;
+  padding: 2rem;
+  color: var(--text-dim);
+  font-size: 0.85rem;
+}
+
+.team-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 0.75rem;
+  background: var(--bg-elevated);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  margin-bottom: 0.5rem;
+}
+
+.team-item-info {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+}
+
+.team-item-name {
+  font-weight: 500;
+  color: var(--text);
+  font-size: 0.9rem;
+}
+
+.team-item-code {
+  font-size: 0.7rem;
+  color: var(--text-dim);
+  font-family: 'JetBrains Mono', monospace;
 }
 </style>

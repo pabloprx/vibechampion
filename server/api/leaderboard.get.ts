@@ -7,6 +7,7 @@ export default defineEventHandler(async (event) => {
   const query = getQuery(event)
   let period = (query.period as Period) || 'month'
   let sortBy = (query.sortBy as SortMetric) || 'total_tokens'
+  const team = query.team as string | undefined
 
   if (!validPeriods.includes(period)) {
     period = 'month'
@@ -15,5 +16,5 @@ export default defineEventHandler(async (event) => {
     sortBy = 'vibe_score'
   }
 
-  return await getLeaderboard(period, sortBy)
+  return await getLeaderboard(period, sortBy, team)
 })
