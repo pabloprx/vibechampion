@@ -345,7 +345,7 @@ export type Archetype =
   | 'architect'     // Low output/input + high total - massive context provider
   | 'thinker'       // High vibe/tokens efficiency - conversational, exploratory
   | 'grinder'       // High total + low efficiency - brute force retries
-  | 'sniper'        // Low total + high output ratio - precise, targeted
+  | 'rookie'        // Low total - just getting started or barely trying
 
 export interface ArchetypeInfo {
   id: Archetype
@@ -359,31 +359,31 @@ export const ARCHETYPES: Record<Archetype, ArchetypeInfo> = {
     id: 'vibe-coder',
     name: 'Vibe Coder',
     title: 'El Vibe Coder',
-    description: 'Trusts Claude completely. Short prompts, batch approves, pure autonomous mode.'
+    description: 'Less is more - short prompts, massive output'
   },
   'architect': {
     id: 'architect',
     name: 'Architect',
     title: 'El Arquitecto',
-    description: 'Loads massive context. Specs, docs, entire codebases. Claude reads before acting.'
+    description: 'Feeds Claude entire codebases for breakfast'
   },
   'thinker': {
     id: 'thinker',
     name: 'Thinker',
     title: 'El Pensador',
-    description: 'Conversational explorer. Uses Claude as a sparring partner, not a code generator.'
+    description: "More input than output - Claude's favorite conversation partner"
   },
   'grinder': {
     id: 'grinder',
     name: 'Grinder',
     title: 'El Grinder',
-    description: 'Brute force warrior. Many retries, high volume, never gives up.'
+    description: 'Quantity is a quality of its own'
   },
-  'sniper': {
-    id: 'sniper',
-    name: 'Sniper',
-    title: 'El Sniper',
-    description: 'Surgical precision. Targeted prompts, minimal tokens, maximum impact.'
+  'rookie': {
+    id: 'rookie',
+    name: 'Rookie',
+    title: 'El Rookie',
+    description: 'Just getting started... or barely trying'
   }
 }
 
@@ -426,9 +426,9 @@ function calculateArchetype(
     return 'vibe-coder'
   }
 
-  // 3. Sniper: Low volume but efficient - surgical precision
-  if (isLowVolume && vibeEfficiency > 0.003) {
-    return 'sniper'
+  // 3. Rookie: Low volume - just getting started
+  if (isLowVolume) {
+    return 'rookie'
   }
 
   // 4. Grinder: High volume but low efficiency - many retries
@@ -449,7 +449,7 @@ function calculateArchetype(
     return 'vibe-coder'
   }
 
-  return 'sniper'
+  return 'rookie'
 }
 
 // Leaderboard

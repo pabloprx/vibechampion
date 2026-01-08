@@ -140,10 +140,14 @@
                           v-if="entry.archetype"
                           class="archetype-badge"
                           :style="{ '--archetype-color': getArchetypeInfo(entry.archetype).color }"
-                          :title="getArchetypeInfo(entry.archetype).description"
                         >
                           <span class="archetype-icon" v-html="getArchetypeIcon(entry.archetype)"></span>
                           <span class="archetype-name">{{ getArchetypeInfo(entry.archetype).name }}</span>
+                          <span class="archetype-tooltip">
+                            <span class="tooltip-title">{{ getArchetypeInfo(entry.archetype).title }}</span>
+                            <span class="tooltip-desc">{{ getArchetypeInfo(entry.archetype).description }}</span>
+                            <span class="tooltip-joke">"{{ getRandomJoke(entry.archetype) }}"</span>
+                          </span>
                         </span>
                       </div>
                       <span v-if="index < 3" class="roast">{{ getRandomRoast(entry.name) }}</span>
@@ -404,13 +408,14 @@ import { ref, watch, onMounted, onUnmounted } from 'vue'
 
 const REFETCH_INTERVAL = 2 * 60 * 1000
 
-type Archetype = 'vibe-coder' | 'architect' | 'thinker' | 'grinder' | 'sniper'
+type Archetype = 'vibe-coder' | 'architect' | 'thinker' | 'grinder' | 'rookie'
 
 interface ArchetypeInfo {
   id: Archetype
   name: string
   title: string
   description: string
+  jokes: string[]
   color: string
 }
 
@@ -419,36 +424,61 @@ const ARCHETYPES: Record<Archetype, ArchetypeInfo> = {
     id: 'vibe-coder',
     name: 'Vibe Coder',
     title: 'El Vibe Coder',
-    description: 'Trusts Claude completely. Short prompts, batch approves, pure autonomous mode.',
+    description: 'Less is more - short prompts, massive output',
+    jokes: [
+      "Trust issues? Never heard of her",
+      "Ships code faster than reviews it",
+      "YOLO-driven development"
+    ],
     color: '#4ade80'
   },
   'architect': {
     id: 'architect',
     name: 'Architect',
     title: 'El Arquitecto',
-    description: 'Loads massive context. Specs, docs, entire codebases. Claude reads before acting.',
+    description: 'Feeds Claude entire codebases for breakfast',
+    jokes: [
+      "Context window? More like context mansion",
+      "RAM is just a suggestion",
+      "Pastes the entire repo and asks 'what does this do?'"
+    ],
     color: '#60a5fa'
   },
   'thinker': {
     id: 'thinker',
     name: 'Thinker',
     title: 'El Pensador',
-    description: 'Conversational explorer. Uses Claude as a sparring partner, not a code generator.',
+    description: "More input than output - Claude's favorite conversation partner",
+    jokes: [
+      "Rubber duck debugging, but the duck talks back",
+      "Claude's unofficial therapist",
+      "Pays more for conversations than actual therapy"
+    ],
     color: '#c084fc'
   },
   'grinder': {
     id: 'grinder',
     name: 'Grinder',
     title: 'El Grinder',
-    description: 'Brute force warrior. Many retries, high volume, never gives up.',
+    description: 'Quantity is a quality of its own',
+    jokes: [
+      "Token printer go brrr",
+      "Error 500? Let me try that 47 more times",
+      "Brute force is a valid algorithm"
+    ],
     color: '#f97316'
   },
-  'sniper': {
-    id: 'sniper',
-    name: 'Sniper',
-    title: 'El Sniper',
-    description: 'Surgical precision. Targeted prompts, minimal tokens, maximum impact.',
-    color: '#ef4444'
+  'rookie': {
+    id: 'rookie',
+    name: 'Rookie',
+    title: 'El Rookie',
+    description: 'Just getting started... or barely trying',
+    jokes: [
+      "Management said 'use AI', this is the result",
+      "Still reading the documentation",
+      "Free trial energy"
+    ],
+    color: '#94a3b8'
   }
 }
 
@@ -667,6 +697,11 @@ function getArchetypeInfo(archetype: Archetype): ArchetypeInfo {
   return ARCHETYPES[archetype] || ARCHETYPES['vibe-coder']
 }
 
+function getRandomJoke(archetype: Archetype): string {
+  const info = ARCHETYPES[archetype] || ARCHETYPES['vibe-coder']
+  return info.jokes[Math.floor(Math.random() * info.jokes.length)]
+}
+
 // Pixel art SVG icons for each archetype (16x16 grid)
 function getArchetypeIcon(archetype: Archetype): string {
   const icons: Record<Archetype, string> = {
@@ -703,14 +738,13 @@ function getArchetypeIcon(archetype: Archetype): string {
       <rect x="9" y="5" width="2" height="2" fill="#0a0a0a"/>
       <rect x="5" y="9" width="6" height="2" fill="#0a0a0a"/>
     </svg>`,
-    // Sniper: character with crosshairs/scope
-    'sniper': `<svg viewBox="0 0 16 16" fill="currentColor">
-      <rect x="5" y="4" width="6" height="8" rx="1"/>
-      <rect x="6" y="6" width="1" height="2" fill="#0a0a0a"/>
-      <rect x="9" y="6" width="1" height="2" fill="#0a0a0a"/>
-      <circle cx="13" cy="6" r="2" fill="none" stroke="currentColor" stroke-width="1"/>
-      <line x1="13" y1="4" x2="13" y2="8" stroke="currentColor" stroke-width="0.5"/>
-      <line x1="11" y1="6" x2="15" y2="6" stroke="currentColor" stroke-width="0.5"/>
+    // Rookie: simple confused face with question mark
+    'rookie': `<svg viewBox="0 0 16 16" fill="currentColor">
+      <rect x="4" y="4" width="8" height="8" rx="2"/>
+      <rect x="5" y="6" width="2" height="2" fill="#0a0a0a"/>
+      <rect x="9" y="6" width="2" height="2" fill="#0a0a0a"/>
+      <rect x="6" y="9" width="4" height="1" fill="#0a0a0a"/>
+      <text x="13" y="5" font-size="5" fill="currentColor">?</text>
     </svg>`
   }
   return icons[archetype] || icons['vibe-coder']
@@ -1444,6 +1478,7 @@ html, body {
 
 /* Archetype Badge */
 .archetype-badge {
+  position: relative;
   display: inline-flex;
   align-items: center;
   gap: 0.35rem;
@@ -1482,6 +1517,63 @@ html, body {
 
 .archetype-name {
   white-space: nowrap;
+}
+
+.archetype-tooltip {
+  position: absolute;
+  bottom: 100%;
+  left: 50%;
+  transform: translateX(-50%);
+  background: var(--bg);
+  border: 1px solid var(--archetype-color);
+  border-radius: 8px;
+  padding: 0.75rem;
+  min-width: 220px;
+  opacity: 0;
+  visibility: hidden;
+  transition: all 0.2s;
+  z-index: 100;
+  pointer-events: none;
+  margin-bottom: 8px;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.5);
+}
+
+.archetype-badge:hover .archetype-tooltip {
+  opacity: 1;
+  visibility: visible;
+}
+
+.archetype-tooltip::after {
+  content: '';
+  position: absolute;
+  top: 100%;
+  left: 50%;
+  transform: translateX(-50%);
+  border: 6px solid transparent;
+  border-top-color: var(--archetype-color);
+}
+
+.tooltip-title {
+  display: block;
+  font-weight: 700;
+  color: var(--archetype-color);
+  font-size: 0.85rem;
+  margin-bottom: 0.25rem;
+}
+
+.tooltip-desc {
+  display: block;
+  color: var(--text);
+  font-size: 0.75rem;
+  margin-bottom: 0.5rem;
+  line-height: 1.3;
+}
+
+.tooltip-joke {
+  display: block;
+  color: var(--text-dim);
+  font-size: 0.7rem;
+  font-style: italic;
 }
 
 .roast {
