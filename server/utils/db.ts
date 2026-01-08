@@ -19,7 +19,9 @@ export async function initDb(): Promise<void> {
   await client.batch([
     `CREATE TABLE IF NOT EXISTS users (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
-      name TEXT UNIQUE NOT NULL,
+      name TEXT NOT NULL,
+      machine_id TEXT,
+      display_name TEXT,
       created_at TEXT DEFAULT (datetime('now'))
     )`,
     `CREATE TABLE IF NOT EXISTS daily_stats (
@@ -57,7 +59,8 @@ export async function initDb(): Promise<void> {
       FOREIGN KEY (team_id) REFERENCES teams(id)
     )`,
     `CREATE INDEX IF NOT EXISTS idx_user_teams_user ON user_teams(user_id)`,
-    `CREATE INDEX IF NOT EXISTS idx_user_teams_team ON user_teams(team_id)`
+    `CREATE INDEX IF NOT EXISTS idx_user_teams_team ON user_teams(team_id)`,
+    `CREATE UNIQUE INDEX IF NOT EXISTS idx_users_machine_id ON users(machine_id)`
   ])
 
   // Migration: Add machine_id and display_name columns
