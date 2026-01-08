@@ -1,7 +1,9 @@
 import { leaveTeam } from '../../../utils/db'
 
 interface LeaveTeamBody {
-  user_name: string
+  machine_id: string
+  // Legacy support
+  user_name?: string
 }
 
 export default defineEventHandler(async (event) => {
@@ -15,14 +17,17 @@ export default defineEventHandler(async (event) => {
     })
   }
 
-  if (!body.user_name) {
+  // Support both new (machine_id) and legacy (user_name) formats
+  const machineId = body.machine_id || body.user_name
+
+  if (!machineId) {
     throw createError({
       statusCode: 400,
-      message: 'user_name is required'
+      message: 'machine_id is required'
     })
   }
 
-  const success = await leaveTeam(body.user_name, code)
+  const success = await leaveTeam(machineId, code)
 
   return { success }
 })

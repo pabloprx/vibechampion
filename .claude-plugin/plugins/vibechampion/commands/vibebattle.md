@@ -7,7 +7,8 @@ Config stored at: `~/.config/vibechampion/config.json`
 
 ```json
 {
-  "username": "your-name",
+  "machine_id": "uuid-v4-generated-once",
+  "display_name": "your-name",
   "team": "TEAM-CODE",
   "visibility": "both",
   "server": "https://vibechampion.vercel.app",
@@ -16,7 +17,8 @@ Config stored at: `~/.config/vibechampion/config.json`
 ```
 
 Fields:
-- `username`: Your display name on the leaderboard
+- `machine_id`: Unique identifier for this machine (auto-generated UUID, never changes)
+- `display_name`: Your display name on the leaderboard (can be changed)
 - `team`: Team code (optional) - if set, shows team leaderboard by default
 - `visibility`: Where your stats appear - "public", "team", or "both"
 - `server`: API server URL
@@ -33,7 +35,7 @@ Read `~/.config/vibechampion/config.json`. If it doesn't exist or `acknowledged`
 Use AskUserQuestion to collect info. Ask all questions in ONE call with multiple questions:
 
 **Question 1: "What's your battle name?"**
-- Header: "Username"
+- Header: "Display Name"
 - Options: Let them type custom input (use Other)
 - This will appear on the leaderboard
 
@@ -57,26 +59,33 @@ Use AskUserQuestion to collect info. Ask all questions in ONE call with multiple
 - Options: "Yes, let's battle" / "No thanks"
 
 If they accept:
-1. Create config directory: `mkdir -p ~/.config/vibechampion`
-2. Write config file with username, team (if provided), visibility, server, acknowledged: true
-3. If team code provided, join the team on server:
+1. Generate machine_id: Use Node.js `crypto.randomUUID()` to generate a unique identifier
+2. Create config directory: `mkdir -p ~/.config/vibechampion`
+3. Write config file with machine_id, display_name, team (if provided), visibility, server, acknowledged: true
+4. If team code provided, join the team on server:
    ```bash
    curl -s -X POST "https://vibechampion.vercel.app/api/teams/{TEAM_CODE}/join" \
      -H "Content-Type: application/json" \
-     -d '{"user_name": "{USERNAME}", "visibility": "{VISIBILITY}"}'
+     -d '{"machine_id": "{MACHINE_ID}", "display_name": "{DISPLAY_NAME}", "visibility": "{VISIBILITY}"}'
    ```
    - If team doesn't exist (404), tell user: "Team code not found. You can create it at vibechampion.vercel.app or ask your team lead for the correct code."
-4. Continue to sync
+5. Continue to sync
 
 If they decline: Exit with "No worries, your stats stay private."
+
+### 2.1. Auto-generate machine_id (for existing configs)
+
+After reading config, check if machine_id exists:
+- If missing: Generate one with `crypto.randomUUID()` and save it to config
+- This handles migration for users who already have config files
 
 ### 3. Sync Team Membership (check if user joined team via web)
 
 Before syncing stats, check if user's team membership changed on the server:
 
 ```bash
-# Get user's teams from server
-curl -s "https://vibechampion.vercel.app/api/users/{USERNAME}/teams"
+# Get user's teams from server using machine_id
+curl -s "https://vibechampion.vercel.app/api/users/{MACHINE_ID}/teams"
 ```
 
 Response:
@@ -128,7 +137,8 @@ Parse the JSON output. The format is:
 POST to `https://vibechampion.vercel.app/api/stats`:
 ```json
 {
-  "user": "{username}",
+  "machine_id": "{machine_id}",
+  "display_name": "{display_name}",
   "daily": [/* array from ccusage */]
 }
 ```
@@ -137,7 +147,7 @@ Use curl:
 ```bash
 curl -s -X POST https://vibechampion.vercel.app/api/stats \
   -H "Content-Type: application/json" \
-  -d '{"user": "NAME", "daily": [...]}'
+  -d '{"machine_id": "MACHINE_ID", "display_name": "NAME", "daily": [...]}'
 ```
 
 ### 6. Get Leaderboard
@@ -199,20 +209,20 @@ Handle these BEFORE doing anything else:
 - `/vibebattle pause` - Set `"paused": true` in config. Say "Auto-sync paused. Run /vibebattle resume to re-enable."
 - `/vibebattle resume` - Remove `paused` from config. Say "Auto-sync resumed."
 - `/vibebattle reset` - Delete config file. Re-run onboarding next time.
-- `/vibebattle status` - Show current config (username, team, visibility, paused state)
+- `/vibebattle status` - Show current config (display_name, machine_id, team, visibility, paused state)
 
 ### Team Commands
 
 - `/vibebattle join CODE` - Join a team:
   1. Ask visibility: "Public + Team" / "Team Only" / "Public Only"
-  2. Call API: `POST /api/teams/{CODE}/join` with user_name and visibility
+  2. Call API: `POST /api/teams/{CODE}/join` with machine_id, display_name, and visibility
   3. If 404: "Team not found. Check the code or create it at vibechampion.vercel.app"
   4. If success: Update config.json with team and visibility
   5. Say "Joined team {NAME}! Your stats will appear on the team leaderboard."
 
 - `/vibebattle leave-team` - Leave current team:
   1. If no team in config: "You're not in a team."
-  2. Call API: `POST /api/teams/{CODE}/leave` with user_name
+  2. Call API: `POST /api/teams/{CODE}/leave` with machine_id
   3. Remove team and visibility from config.json
   4. Say "Left team. Your stats will only appear on the global leaderboard."
 

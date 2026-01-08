@@ -59,11 +59,48 @@ export async function initDb(): Promise<void> {
     `CREATE INDEX IF NOT EXISTS idx_user_teams_user ON user_teams(user_id)`,
     `CREATE INDEX IF NOT EXISTS idx_user_teams_team ON user_teams(team_id)`
   ])
+
+  // Migration: Add machine_id and display_name columns
+  await runMigration(client)
+}
+
+async function runMigration(client: Client): Promise<void> {
+  // Check if machine_id column exists
+  const tableInfo = await client.execute(`PRAGMA table_info(users)`)
+  const hasMachineId = tableInfo.rows.some((row: any) => row.name === 'machine_id')
+
+  if (!hasMachineId) {
+    console.log('[Migration] Adding machine_id and display_name columns...')
+
+    // Add new columns
+    await client.batch([
+      `ALTER TABLE users ADD COLUMN machine_id TEXT`,
+      `ALTER TABLE users ADD COLUMN display_name TEXT`
+    ])
+
+    // Backfill existing users: generate UUIDs and copy name to display_name
+    const existingUsers = await client.execute(`SELECT id, name FROM users`)
+
+    for (const user of existingUsers.rows) {
+      const machineId = crypto.randomUUID()
+      await client.execute({
+        sql: `UPDATE users SET machine_id = ?, display_name = ? WHERE id = ?`,
+        args: [machineId, user.name, user.id]
+      })
+    }
+
+    // Create unique index on machine_id
+    await client.execute(`CREATE UNIQUE INDEX idx_users_machine_id ON users(machine_id)`)
+
+    console.log(`[Migration] Backfilled ${existingUsers.rows.length} users with machine_ids`)
+  }
 }
 
 export interface User {
   id: number
-  name: string
+  machine_id: string
+  display_name: string
+  name: string // deprecated: kept for backward compat during migration
   created_at: string
 }
 
@@ -116,30 +153,43 @@ export interface TeamWithMembership extends Team {
 }
 
 // User operations
-export async function getOrCreateUser(name: string): Promise<User> {
+export async function getOrCreateUser(machineId: string, displayName: string): Promise<User> {
   const client = getDb()
   const existing = await client.execute({
-    sql: 'SELECT * FROM users WHERE name = ?',
-    args: [name]
+    sql: 'SELECT * FROM users WHERE machine_id = ?',
+    args: [machineId]
   })
 
   if (existing.rows.length > 0) {
-    return existing.rows[0] as unknown as User
+    const user = existing.rows[0] as unknown as User
+    // Update display_name if changed
+    if (user.display_name !== displayName) {
+      await client.execute({
+        sql: 'UPDATE users SET display_name = ? WHERE machine_id = ?',
+        args: [displayName, machineId]
+      })
+      user.display_name = displayName
+    }
+    return user
   }
 
+  // Create new user with machine_id
   const result = await client.execute({
-    sql: 'INSERT INTO users (name) VALUES (?)',
-    args: [name]
+    sql: 'INSERT INTO users (machine_id, display_name, name) VALUES (?, ?, ?)',
+    args: [machineId, displayName, displayName] // name = display_name for backward compat
   })
 
   return {
     id: Number(result.lastInsertRowid),
-    name,
+    machine_id: machineId,
+    display_name: displayName,
+    name: displayName,
     created_at: new Date().toISOString()
   }
 }
 
-export async function getUser(name: string): Promise<User | undefined> {
+// Legacy: get user by name (for backward compat)
+export async function getUserByName(name: string): Promise<User | undefined> {
   const client = getDb()
   const result = await client.execute({
     sql: 'SELECT * FROM users WHERE name = ?',
@@ -148,9 +198,18 @@ export async function getUser(name: string): Promise<User | undefined> {
   return result.rows[0] as unknown as User | undefined
 }
 
+export async function getUser(machineId: string): Promise<User | undefined> {
+  const client = getDb()
+  const result = await client.execute({
+    sql: 'SELECT * FROM users WHERE machine_id = ?',
+    args: [machineId]
+  })
+  return result.rows[0] as unknown as User | undefined
+}
+
 export async function getAllUsers(): Promise<User[]> {
   const client = getDb()
-  const result = await client.execute('SELECT * FROM users ORDER BY name')
+  const result = await client.execute('SELECT * FROM users ORDER BY display_name')
   return result.rows as unknown as User[]
 }
 
@@ -185,8 +244,8 @@ export async function upsertDailyStats(userId: number, stats: StatsPayload): Pro
   })
 }
 
-export async function bulkUpsertStats(userName: string, dailyStats: StatsPayload[]): Promise<void> {
-  const user = await getOrCreateUser(userName)
+export async function bulkUpsertStats(machineId: string, displayName: string, dailyStats: StatsPayload[]): Promise<void> {
+  const user = await getOrCreateUser(machineId, displayName)
   for (const s of dailyStats) {
     await upsertDailyStats(user.id, s)
   }
@@ -246,12 +305,13 @@ export async function updateTeam(code: string, updates: { name?: string; image_u
 }
 
 export async function joinTeam(
-  userName: string,
+  machineId: string,
+  displayName: string,
   teamCode: string,
   visibility: Visibility = 'both'
 ): Promise<{ user: User; team: Team; visibility: Visibility }> {
   const client = getDb()
-  const user = await getOrCreateUser(userName)
+  const user = await getOrCreateUser(machineId, displayName)
   const team = await getTeamByCode(teamCode)
 
   if (!team) {
@@ -271,9 +331,9 @@ export async function joinTeam(
   return { user, team, visibility }
 }
 
-export async function leaveTeam(userName: string, teamCode: string): Promise<boolean> {
+export async function leaveTeam(machineId: string, teamCode: string): Promise<boolean> {
   const client = getDb()
-  const user = await getUser(userName)
+  const user = await getUser(machineId)
   const team = await getTeamByCode(teamCode)
 
   if (!user || !team) return false
@@ -286,9 +346,9 @@ export async function leaveTeam(userName: string, teamCode: string): Promise<boo
   return true
 }
 
-export async function getUserTeams(userName: string): Promise<TeamWithMembership[]> {
+export async function getUserTeams(machineId: string): Promise<TeamWithMembership[]> {
   const client = getDb()
-  const user = await getUser(userName)
+  const user = await getUser(machineId)
   if (!user) return []
 
   const result = await client.execute({
@@ -315,7 +375,7 @@ export async function getTeamMembers(teamCode: string): Promise<{ name: string; 
 
   const result = await client.execute({
     sql: `
-      SELECT u.name, ut.visibility, ut.joined_at
+      SELECT u.display_name as name, ut.visibility, ut.joined_at
       FROM users u
       JOIN user_teams ut ON u.id = ut.user_id
       WHERE ut.team_id = ?
@@ -566,7 +626,7 @@ export async function getLeaderboard(
   const result = await client.execute({
     sql: `
       SELECT
-        u.name,
+        u.display_name as name,
         COALESCE(SUM(ds.total_tokens), 0) as total_tokens,
         COALESCE(SUM(ds.output_tokens), 0) as output_tokens,
         COALESCE(SUM(ds.input_tokens), 0) as input_tokens,
@@ -582,7 +642,7 @@ export async function getLeaderboard(
       ${teamFilter}
       LEFT JOIN daily_stats ds ON u.id = ds.user_id AND ds.date >= ?
       WHERE 1=1 ${publicFilter}
-      GROUP BY u.id, u.name
+      GROUP BY u.id, u.display_name
       HAVING total_tokens > 0
       ORDER BY ${sortBy} DESC
     `,
@@ -609,9 +669,9 @@ export async function getLeaderboard(
   }
 }
 
-export async function getUserStats(userName: string, period: Period = 'month') {
+export async function getUserStats(machineId: string, period: Period = 'month') {
   const client = getDb()
-  const user = await getUser(userName)
+  const user = await getUser(machineId)
   if (!user) return null
 
   const { since, label } = getPeriodDates(period)
