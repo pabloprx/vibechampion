@@ -35,7 +35,7 @@
         <div class="update-content">
           <span class="update-version">v1.2</span>
           <span class="update-text">Teams feature! Update your plugin:</span>
-          <code class="update-cmd">claude mcp update vibechampion</code>
+          <code class="update-cmd">claude plugin update vibechampion</code>
           <span class="update-date">Jan 8, 2026</span>
         </div>
         <button class="update-dismiss" @click="dismissUpdateAlert">&times;</button>
