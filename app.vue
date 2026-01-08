@@ -34,8 +34,11 @@
       <div v-if="showUpdateAlert" class="update-alert">
         <div class="update-content">
           <span class="update-version">v1.2</span>
-          <span class="update-text">Teams feature! Update your plugin:</span>
-          <code class="update-cmd">claude plugin update vibechampion</code>
+          <span class="update-text">Teams feature! Update:</span>
+          <code class="update-cmd clickable" @click="copyAlertCommand">
+            claude plugin update vibechampion@pabloprx-vibechampion
+            <span class="copy-hint">{{ copiedAlertCmd ? 'COPIED' : 'CLICK TO COPY' }}</span>
+          </code>
           <span class="update-date">Jan 8, 2026</span>
         </div>
         <button class="update-dismiss" @click="dismissUpdateAlert">&times;</button>
@@ -212,17 +215,17 @@
                 <div class="step-content">
                   <span class="step-label">Battle</span>
                   <div class="cmd highlight">
-                    <code>/vibebattle</code>
+                    <code>/vibechampion:vibebattle</code>
                   </div>
                 </div>
               </div>
             </div>
 
             <div class="update-banner">
-              <div class="update-badge">v1.1</div>
+              <div class="update-badge">v1.2</div>
               <div class="update-info">
-                <span class="update-title">Update available</span>
-                <span class="update-desc">Better session tracking</span>
+                <span class="update-title">Teams update</span>
+                <span class="update-desc">Create teams, share leaderboards</span>
               </div>
             </div>
             <div class="update-cmd" @click="copyUpdateCommand">
@@ -340,7 +343,10 @@
             <div v-for="t in myTeams" :key="t.code" class="team-item">
               <div class="team-item-info">
                 <span class="team-item-name">{{ t.name }}</span>
-                <span class="team-item-code">{{ t.code }}</span>
+                <div class="team-join-cmd" @click="copyJoinCommand(t.code)">
+                  <code>/vibechampion:vibebattle join {{ t.code }}</code>
+                  <span class="copy-hint-small">{{ copiedJoinCode === t.code ? 'COPIED' : 'COPY' }}</span>
+                </div>
               </div>
               <button class="btn-danger-sm" @click="leaveTeam(t.code)">Leave</button>
             </div>
@@ -452,6 +458,7 @@ const hoveredWinner = ref(false)
 // Update alert
 const UPDATE_VERSION = 'v1.2'
 const showUpdateAlert = ref(false)
+const copiedAlertCmd = ref(false)
 
 function initUpdateAlert() {
   const dismissed = localStorage.getItem('vibechampion_update_dismissed')
@@ -463,9 +470,22 @@ function dismissUpdateAlert() {
   localStorage.setItem('vibechampion_update_dismissed', UPDATE_VERSION)
 }
 
+function copyAlertCommand() {
+  navigator.clipboard.writeText('claude plugin update vibechampion@pabloprx-vibechampion')
+  copiedAlertCmd.value = true
+  setTimeout(() => { copiedAlertCmd.value = false }, 2000)
+}
+
 // Team state
 const currentTeam = ref<string | null>(null)
 const myTeams = ref<MyTeam[]>([])
+const copiedJoinCode = ref<string | null>(null)
+
+function copyJoinCommand(code: string) {
+  navigator.clipboard.writeText(`/vibechampion:vibebattle join ${code}`)
+  copiedJoinCode.value = code
+  setTimeout(() => { copiedJoinCode.value = null }, 2000)
+}
 const showTeamModal = ref(false)
 const teamModalMode = ref<'create' | 'join'>('join')
 const pendingTeamCode = ref('')
@@ -2211,9 +2231,49 @@ html, body {
   font-size: 0.9rem;
 }
 
-.team-item-code {
+.team-join-cmd {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  background: var(--surface);
+  padding: 0.25rem 0.5rem;
+  border-radius: 2px;
+  cursor: pointer;
+  transition: background 0.2s;
+}
+
+.team-join-cmd:hover {
+  background: var(--border);
+}
+
+.team-join-cmd code {
   font-size: 0.7rem;
-  color: var(--text-dim);
+  color: var(--accent);
   font-family: 'JetBrains Mono', monospace;
+}
+
+.copy-hint-small {
+  font-size: 0.6rem;
+  color: var(--text-dim);
+  text-transform: uppercase;
+}
+
+.update-cmd.clickable {
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  transition: background 0.2s;
+}
+
+.update-cmd.clickable:hover {
+  background: rgba(0, 255, 136, 0.15);
+}
+
+.copy-hint {
+  font-size: 0.65rem;
+  color: var(--text-dim);
+  text-transform: uppercase;
+  opacity: 0.8;
 }
 </style>
