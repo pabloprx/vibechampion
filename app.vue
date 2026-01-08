@@ -248,13 +248,29 @@
             <button class="modal-close" @click="closeTeamModal">&times;</button>
           </div>
           <div class="modal-body">
+            <!-- Mode Toggle -->
+            <div class="mode-toggle">
+              <button
+                :class="{ active: teamModalMode === 'join' }"
+                @click="teamModalMode = 'join'; teamError = ''"
+              >
+                Join Existing
+              </button>
+              <button
+                :class="{ active: teamModalMode === 'create' }"
+                @click="teamModalMode = 'create'; teamError = ''"
+              >
+                Create New
+              </button>
+            </div>
+
             <div class="form-group">
               <label>Team Code</label>
               <input
                 v-model="pendingTeamCode"
                 type="text"
                 placeholder="e.g. ACME-2024"
-                :disabled="teamModalMode === 'join' && newTeamName"
+                @input="teamError = ''; newTeamName = ''"
               />
               <span class="form-hint">3-20 chars, alphanumeric and hyphens</span>
             </div>
@@ -269,18 +285,8 @@
               <input v-model="newTeamImageUrl" type="text" placeholder="https://..." />
             </div>
 
-            <div v-if="teamModalMode === 'join'" class="team-preview">
-              <div v-if="newTeamName" class="team-info">
-                <img v-if="newTeamImageUrl" :src="newTeamImageUrl" class="team-logo" alt="" />
-                <div class="team-details">
-                  <span class="team-name">{{ newTeamName }}</span>
-                  <span class="team-code">{{ pendingTeamCode }}</span>
-                </div>
-              </div>
-            </div>
-
             <div class="form-group">
-              <label>Visibility</label>
+              <label>Your Visibility</label>
               <div class="visibility-options">
                 <label class="radio-option">
                   <input type="radio" v-model="newTeamVisibility" value="both" />
@@ -1925,6 +1931,36 @@ html, body {
   display: flex;
   flex-direction: column;
   gap: 1rem;
+}
+
+.mode-toggle {
+  display: flex;
+  gap: 0;
+  background: var(--surface);
+  border-radius: 4px;
+  padding: 2px;
+}
+
+.mode-toggle button {
+  flex: 1;
+  padding: 0.5rem 1rem;
+  background: transparent;
+  border: none;
+  color: var(--text-dim);
+  font-size: 0.8rem;
+  font-weight: 500;
+  cursor: pointer;
+  border-radius: 2px;
+  transition: all 0.2s;
+}
+
+.mode-toggle button:hover {
+  color: var(--text);
+}
+
+.mode-toggle button.active {
+  background: var(--accent);
+  color: var(--bg);
 }
 
 .modal-footer {
