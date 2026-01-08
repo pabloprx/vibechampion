@@ -57,7 +57,7 @@
                     :class="{ active: !currentTeam }"
                     @click="selectTeam(null)"
                   >
-                    PUBLIC
+                    GLOBAL
                   </button>
                   <button
                     v-for="t in myTeams"

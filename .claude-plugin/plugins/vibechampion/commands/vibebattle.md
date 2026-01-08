@@ -40,10 +40,10 @@ Use AskUserQuestion to collect info. Ask all questions in ONE call with multiple
 **Question 2: "Team code (optional)"**
 - Header: "Team"
 - Options:
-  - "Skip - join public only"
+  - "Skip - global only"
   - "Enter code" (let them type)
 - If they have a team code from a coworker, they enter it here
-- If empty/skipped, they only appear on public leaderboard
+- If empty/skipped, they only appear on global leaderboard
 
 **Question 3: "Where should your stats appear?"** (only if team code provided)
 - Header: "Visibility"
@@ -145,11 +145,11 @@ curl -s -X POST https://vibechampion.vercel.app/api/stats \
 Build the URL based on config:
 - Base: `https://vibechampion.vercel.app/api/leaderboard`
 - Add period: `?period=month` (or week, semester, year, all)
-- If team in config AND not using `/vibebattle public`: add `&team={TEAM_CODE}`
+- If team in config AND not using `/vibebattle global`: add `&team={TEAM_CODE}`
 
 Examples:
 ```bash
-# Public monthly (no team or /vibebattle public)
+# Global monthly (no team or /vibebattle global)
 GET https://vibechampion.vercel.app/api/leaderboard?period=month
 
 # Team monthly (team in config)
@@ -214,14 +214,14 @@ Handle these BEFORE doing anything else:
   1. If no team in config: "You're not in a team."
   2. Call API: `POST /api/teams/{CODE}/leave` with user_name
   3. Remove team and visibility from config.json
-  4. Say "Left team. Your stats will only appear on the public leaderboard."
+  4. Say "Left team. Your stats will only appear on the global leaderboard."
 
 - `/vibebattle team` - Show team leaderboard (if in a team)
 
 ### Leaderboard Commands (sync first)
 
-- `/vibebattle` - Sync stats and show leaderboard (team if configured, otherwise public monthly)
-- `/vibebattle public` - Show public leaderboard (ignores team setting)
+- `/vibebattle` - Sync stats and show leaderboard (team if configured, otherwise global monthly)
+- `/vibebattle global` - Show global leaderboard (ignores team setting)
 - `/vibebattle week` - Show weekly leaderboard
 - `/vibebattle semester` - Show semester leaderboard
 - `/vibebattle year` - Show yearly leaderboard
