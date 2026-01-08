@@ -474,38 +474,38 @@ function calculateArchetype(
   const isMediumVolume = total_tokens > 100_000_000  // 100M+ tokens
   const isLowVolume = total_tokens < 50_000_000      // under 50M tokens
 
-  // Boss's analysis patterns:
-  // Pablo (vibe-coder): output/input ~0.79, autonomous, lets Claude cook
-  // Luis (architect): 1.7B tokens, 96% cache_read, loads massive context
-  // Felipe (thinker): conversational, high vibe efficiency relative to tokens
+  // Classification priority: output/input ratio first, then cache patterns
+  // Pablo: 0.796 output/input = vibe-coder (generates tons of code)
+  // Luis: 0.262 output/input + 96% cache = architect (loads context, doesn't generate)
+  // Felipe: 0.172 output/input = thinker (conversational)
 
-  // 1. Architect: Loads massive context (high cache ratio + high volume)
-  if (cacheRatio > 0.85 && isHighVolume) {
-    return 'architect'
-  }
-
-  // 2. Vibe Coder: High output/input ratio - trusts Claude to generate
-  if (outputInputRatio > 0.5 && isMediumVolume) {
-    return 'vibe-coder'
-  }
-
-  // 3. Rookie: Low volume - just getting started
+  // 1. Rookie: Low volume - just getting started
   if (isLowVolume) {
     return 'rookie'
   }
 
+  // 2. Vibe Coder: High output/input ratio - lets Claude cook
+  if (outputInputRatio > 0.5 && isMediumVolume) {
+    return 'vibe-coder'
+  }
+
+  // 3. Architect: High cache ratio + LOW output/input (loads codebases, doesn't generate much)
+  if (cacheRatio > 0.85 && outputInputRatio < 0.4 && isMediumVolume) {
+    return 'architect'
+  }
+
   // 4. Grinder: High volume but low efficiency - many retries
-  if (isMediumVolume && vibeEfficiency < 0.002) {
+  if (isMediumVolume && vibeEfficiency < 0.002 && outputInputRatio > 0.3) {
     return 'grinder'
   }
 
-  // 5. Thinker: Conversational, medium efficiency, balanced approach
-  if (vibeEfficiency > 0.003 || outputInputRatio < 0.3) {
+  // 5. Thinker: Low output/input ratio - conversational, exploratory
+  if (outputInputRatio < 0.3) {
     return 'thinker'
   }
 
-  // Default based on volume
-  if (isHighVolume) {
+  // Default based on volume and patterns
+  if (isHighVolume && cacheRatio > 0.85) {
     return 'architect'
   }
   if (isMediumVolume) {
