@@ -366,13 +366,25 @@
           </div>
           <div class="modal-body">
             <div class="invite-team-name">{{ joinInviteTeamName }}</div>
-            <p class="invite-desc">Run this command in Claude Code to join:</p>
-            <div class="invite-cmd" @click="copyInviteCommand">
-              <code>/vibechampion:vibebattle join {{ joinInviteCode }}</code>
-              <span class="copy-hint">{{ copiedInviteCmd ? 'COPIED!' : 'CLICK TO COPY' }}</span>
+
+            <div class="invite-step">
+              <span class="invite-step-num">1</span>
+              <div class="invite-step-content">
+                <p class="invite-step-title">Install or Update plugin</p>
+                <code class="invite-install">claude plugin install vibechampion@pabloprx-vibechampion</code>
+              </div>
             </div>
-            <p class="invite-note">First time? Install the plugin first:</p>
-            <code class="invite-install">claude plugin install vibechampion@pabloprx-vibechampion</code>
+
+            <div class="invite-step">
+              <span class="invite-step-num">2</span>
+              <div class="invite-step-content">
+                <p class="invite-step-title">Join the team</p>
+                <div class="invite-cmd" @click="copyInviteCommand">
+                  <code>/vibechampion:vibebattle join {{ joinInviteCode }}</code>
+                  <span class="copy-hint">{{ copiedInviteCmd ? 'COPIED!' : 'CLICK TO COPY' }}</span>
+                </div>
+              </div>
+            </div>
           </div>
           <div class="modal-footer">
             <button class="btn-primary" @click="closeJoinInvite">Got it</button>
@@ -2343,21 +2355,46 @@ html, body {
 
 /* Join Invite Modal */
 .join-invite-modal {
-  max-width: 480px;
+  max-width: 500px;
 }
 
 .invite-team-name {
-  font-size: 1.5rem;
+  font-size: 1.75rem;
   font-weight: 700;
   color: var(--accent);
   text-align: center;
-  margin-bottom: 1rem;
+  margin-bottom: 1.5rem;
+  text-shadow: 0 0 20px var(--accent-glow);
 }
 
-.invite-desc {
+.invite-step {
+  display: flex;
+  gap: 1rem;
+  margin-bottom: 1.25rem;
+}
+
+.invite-step-num {
+  flex-shrink: 0;
+  width: 28px;
+  height: 28px;
+  background: var(--accent);
+  color: var(--bg);
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: 700;
+  font-size: 0.85rem;
+}
+
+.invite-step-content {
+  flex: 1;
+}
+
+.invite-step-title {
   color: var(--text);
-  text-align: center;
-  margin-bottom: 0.75rem;
+  font-weight: 500;
+  margin-bottom: 0.5rem;
   font-size: 0.9rem;
 }
 
@@ -2370,7 +2407,6 @@ html, body {
   padding: 0.75rem 1rem;
   border-radius: 4px;
   cursor: pointer;
-  margin-bottom: 1.5rem;
   transition: all 0.2s;
 }
 
@@ -2380,23 +2416,16 @@ html, body {
 
 .invite-cmd code {
   color: var(--accent);
-  font-size: 0.85rem;
-}
-
-.invite-note {
-  color: var(--text-dim);
-  font-size: 0.75rem;
-  text-align: center;
-  margin-bottom: 0.5rem;
+  font-size: 0.8rem;
 }
 
 .invite-install {
   display: block;
   background: var(--surface);
-  padding: 0.5rem;
-  border-radius: 2px;
-  font-size: 0.7rem;
-  color: var(--text-secondary);
-  text-align: center;
+  padding: 0.6rem 0.75rem;
+  border-radius: 4px;
+  font-size: 0.75rem;
+  color: var(--text);
+  font-family: 'JetBrains Mono', monospace;
 }
 </style>

@@ -524,7 +524,7 @@ export async function getLeaderboard(
   period: Period = 'month',
   sortBy: SortMetric = 'total_tokens',
   teamCode?: string
-): Promise<{ period: string; sortBy: SortMetric; teamCode?: string; teamName?: string; leaderboard: LeaderboardEntry[] }> {
+): Promise<{ period: string; sortBy: SortMetric; teamName?: string; leaderboard: LeaderboardEntry[] }> {
   const client = getDb()
   const { since, label } = getPeriodDates(period)
 
@@ -594,7 +594,6 @@ export async function getLeaderboard(
   return {
     period: label,
     sortBy,
-    teamCode,
     teamName,
     leaderboard: rows.map((r, i) => ({
       ...r,
