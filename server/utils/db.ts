@@ -150,6 +150,119 @@ export async function bulkUpsertStats(userName: string, dailyStats: StatsPayload
   }
 }
 
+// Archetypes based on usage patterns
+export type Archetype =
+  | 'vibe-coder'    // High output/input ratio - trusts Claude, autonomous
+  | 'architect'     // Low output/input + high total - massive context provider
+  | 'thinker'       // High vibe/tokens efficiency - conversational, exploratory
+  | 'grinder'       // High total + low efficiency - brute force retries
+  | 'sniper'        // Low total + high output ratio - precise, targeted
+
+export interface ArchetypeInfo {
+  id: Archetype
+  name: string
+  title: string
+  description: string
+}
+
+export const ARCHETYPES: Record<Archetype, ArchetypeInfo> = {
+  'vibe-coder': {
+    id: 'vibe-coder',
+    name: 'Vibe Coder',
+    title: 'El Vibe Coder',
+    description: 'Trusts Claude completely. Short prompts, batch approves, pure autonomous mode.'
+  },
+  'architect': {
+    id: 'architect',
+    name: 'Architect',
+    title: 'El Arquitecto',
+    description: 'Loads massive context. Specs, docs, entire codebases. Claude reads before acting.'
+  },
+  'thinker': {
+    id: 'thinker',
+    name: 'Thinker',
+    title: 'El Pensador',
+    description: 'Conversational explorer. Uses Claude as a sparring partner, not a code generator.'
+  },
+  'grinder': {
+    id: 'grinder',
+    name: 'Grinder',
+    title: 'El Grinder',
+    description: 'Brute force warrior. Many retries, high volume, never gives up.'
+  },
+  'sniper': {
+    id: 'sniper',
+    name: 'Sniper',
+    title: 'El Sniper',
+    description: 'Surgical precision. Targeted prompts, minimal tokens, maximum impact.'
+  }
+}
+
+function calculateArchetype(
+  input_tokens: number,
+  output_tokens: number,
+  total_tokens: number,
+  vibe_score: number,
+  cache_read_tokens: number = 0
+): Archetype {
+  // Avoid division by zero
+  const inputSafe = Math.max(input_tokens, 1)
+  const totalSafe = Math.max(total_tokens, 1)
+
+  // Key ratios from boss's analysis:
+  // - output/input: how much Claude generates vs what user types
+  // - cache_read/total: how much pre-loaded context (full codebases, docs)
+  // - vibe/tokens: efficiency score
+  const outputInputRatio = output_tokens / inputSafe  // e.g., 0.79 = 79% = Claude outputs a lot
+  const cacheRatio = cache_read_tokens / totalSafe    // e.g., 0.96 = 96% = loads massive context
+  const vibeEfficiency = vibe_score / totalSafe       // higher = more efficient
+
+  // Volume thresholds
+  const isHighVolume = total_tokens > 500_000_000    // 500M+ tokens
+  const isMediumVolume = total_tokens > 100_000_000  // 100M+ tokens
+  const isLowVolume = total_tokens < 50_000_000      // under 50M tokens
+
+  // Boss's analysis patterns:
+  // Pablo (vibe-coder): output/input ~0.79, autonomous, lets Claude cook
+  // Luis (architect): 1.7B tokens, 96% cache_read, loads massive context
+  // Felipe (thinker): conversational, high vibe efficiency relative to tokens
+
+  // 1. Architect: Loads massive context (high cache ratio + high volume)
+  if (cacheRatio > 0.85 && isHighVolume) {
+    return 'architect'
+  }
+
+  // 2. Vibe Coder: High output/input ratio - trusts Claude to generate
+  if (outputInputRatio > 0.5 && isMediumVolume) {
+    return 'vibe-coder'
+  }
+
+  // 3. Sniper: Low volume but efficient - surgical precision
+  if (isLowVolume && vibeEfficiency > 0.003) {
+    return 'sniper'
+  }
+
+  // 4. Grinder: High volume but low efficiency - many retries
+  if (isMediumVolume && vibeEfficiency < 0.002) {
+    return 'grinder'
+  }
+
+  // 5. Thinker: Conversational, medium efficiency, balanced approach
+  if (vibeEfficiency > 0.003 || outputInputRatio < 0.3) {
+    return 'thinker'
+  }
+
+  // Default based on volume
+  if (isHighVolume) {
+    return 'architect'
+  }
+  if (isMediumVolume) {
+    return 'vibe-coder'
+  }
+
+  return 'sniper'
+}
+
 // Leaderboard
 export interface LeaderboardEntry {
   rank: number
@@ -161,6 +274,7 @@ export interface LeaderboardEntry {
   vibe_score: number
   total_cost: number
   days_active: number
+  archetype: Archetype
 }
 
 export type SortMetric = 'vibe_score' | 'total_tokens' | 'output_tokens' | 'total_cost'
@@ -250,12 +364,22 @@ export async function getLeaderboard(
     args: [since]
   })
 
-  const rows = result.rows as unknown as Omit<LeaderboardEntry, 'rank'>[]
+  const rows = result.rows as unknown as Omit<LeaderboardEntry, 'rank' | 'archetype'>[]
 
   return {
     period: label,
     sortBy,
-    leaderboard: rows.map((r, i) => ({ ...r, rank: i + 1 }))
+    leaderboard: rows.map((r, i) => ({
+      ...r,
+      rank: i + 1,
+      archetype: calculateArchetype(
+        r.input_tokens,
+        r.output_tokens,
+        r.total_tokens,
+        r.vibe_score,
+        r.cache_read_tokens
+      )
+    }))
   }
 }
 

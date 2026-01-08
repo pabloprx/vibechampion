@@ -101,7 +101,18 @@
                       <span v-else class="rank-num">{{ index + 1 }}</span>
                     </span>
                     <span class="td-user">
-                      <span class="user-name">{{ entry.name }}</span>
+                      <div class="user-row">
+                        <span class="user-name">{{ entry.name }}</span>
+                        <span
+                          v-if="entry.archetype"
+                          class="archetype-badge"
+                          :style="{ '--archetype-color': getArchetypeInfo(entry.archetype).color }"
+                          :title="getArchetypeInfo(entry.archetype).description"
+                        >
+                          <span class="archetype-icon" v-html="getArchetypeIcon(entry.archetype)"></span>
+                          <span class="archetype-name">{{ getArchetypeInfo(entry.archetype).name }}</span>
+                        </span>
+                      </div>
                       <span v-if="index < 3" class="roast">{{ getRandomRoast(entry.name) }}</span>
                     </span>
                     <span class="td-bar">
@@ -202,6 +213,54 @@ import { ref, watch, onMounted, onUnmounted } from 'vue'
 
 const REFETCH_INTERVAL = 2 * 60 * 1000
 
+type Archetype = 'vibe-coder' | 'architect' | 'thinker' | 'grinder' | 'sniper'
+
+interface ArchetypeInfo {
+  id: Archetype
+  name: string
+  title: string
+  description: string
+  color: string
+}
+
+const ARCHETYPES: Record<Archetype, ArchetypeInfo> = {
+  'vibe-coder': {
+    id: 'vibe-coder',
+    name: 'Vibe Coder',
+    title: 'El Vibe Coder',
+    description: 'Trusts Claude completely. Short prompts, batch approves, pure autonomous mode.',
+    color: '#4ade80'
+  },
+  'architect': {
+    id: 'architect',
+    name: 'Architect',
+    title: 'El Arquitecto',
+    description: 'Loads massive context. Specs, docs, entire codebases. Claude reads before acting.',
+    color: '#60a5fa'
+  },
+  'thinker': {
+    id: 'thinker',
+    name: 'Thinker',
+    title: 'El Pensador',
+    description: 'Conversational explorer. Uses Claude as a sparring partner, not a code generator.',
+    color: '#c084fc'
+  },
+  'grinder': {
+    id: 'grinder',
+    name: 'Grinder',
+    title: 'El Grinder',
+    description: 'Brute force warrior. Many retries, high volume, never gives up.',
+    color: '#f97316'
+  },
+  'sniper': {
+    id: 'sniper',
+    name: 'Sniper',
+    title: 'El Sniper',
+    description: 'Surgical precision. Targeted prompts, minimal tokens, maximum impact.',
+    color: '#ef4444'
+  }
+}
+
 interface LeaderboardEntry {
   rank: number
   name: string
@@ -210,6 +269,7 @@ interface LeaderboardEntry {
   vibe_score: number
   total_cost: number
   days_active: number
+  archetype: Archetype
 }
 
 interface LeaderboardResponse {
@@ -312,6 +372,59 @@ function getRandomRoast(name: string): string {
     assignedRoasts.value.set(name, roasts[randomIndex])
   }
   return assignedRoasts.value.get(name)!
+}
+
+function getArchetypeInfo(archetype: Archetype): ArchetypeInfo {
+  return ARCHETYPES[archetype] || ARCHETYPES['vibe-coder']
+}
+
+// Pixel art SVG icons for each archetype (16x16 grid)
+function getArchetypeIcon(archetype: Archetype): string {
+  const icons: Record<Archetype, string> = {
+    // Vibe Coder: chill face with sunglasses
+    'vibe-coder': `<svg viewBox="0 0 16 16" fill="currentColor">
+      <rect x="4" y="3" width="8" height="10" rx="2"/>
+      <rect x="3" y="6" width="4" height="2" fill="#0a0a0a"/>
+      <rect x="9" y="6" width="4" height="2" fill="#0a0a0a"/>
+      <rect x="6" y="10" width="4" height="1" fill="#0a0a0a"/>
+    </svg>`,
+    // Architect: character with blueprint/grid
+    'architect': `<svg viewBox="0 0 16 16" fill="currentColor">
+      <rect x="3" y="2" width="10" height="12" rx="1"/>
+      <rect x="5" y="4" width="2" height="2" fill="#0a0a0a"/>
+      <rect x="9" y="4" width="2" height="2" fill="#0a0a0a"/>
+      <rect x="5" y="8" width="6" height="1" fill="#0a0a0a"/>
+      <rect x="5" y="10" width="6" height="1" fill="#0a0a0a"/>
+      <rect x="5" y="12" width="6" height="1" fill="#0a0a0a"/>
+    </svg>`,
+    // Thinker: character with thought bubble
+    'thinker': `<svg viewBox="0 0 16 16" fill="currentColor">
+      <rect x="4" y="5" width="8" height="9" rx="2"/>
+      <rect x="5" y="8" width="2" height="2" fill="#0a0a0a"/>
+      <rect x="9" y="8" width="2" height="2" fill="#0a0a0a"/>
+      <circle cx="12" cy="3" r="2"/>
+      <circle cx="14" cy="2" r="1"/>
+    </svg>`,
+    // Grinder: muscular/intense character
+    'grinder': `<svg viewBox="0 0 16 16" fill="currentColor">
+      <rect x="4" y="3" width="8" height="10" rx="1"/>
+      <rect x="2" y="5" width="2" height="6"/>
+      <rect x="12" y="5" width="2" height="6"/>
+      <rect x="5" y="5" width="2" height="2" fill="#0a0a0a"/>
+      <rect x="9" y="5" width="2" height="2" fill="#0a0a0a"/>
+      <rect x="5" y="9" width="6" height="2" fill="#0a0a0a"/>
+    </svg>`,
+    // Sniper: character with crosshairs/scope
+    'sniper': `<svg viewBox="0 0 16 16" fill="currentColor">
+      <rect x="5" y="4" width="6" height="8" rx="1"/>
+      <rect x="6" y="6" width="1" height="2" fill="#0a0a0a"/>
+      <rect x="9" y="6" width="1" height="2" fill="#0a0a0a"/>
+      <circle cx="13" cy="6" r="2" fill="none" stroke="currentColor" stroke-width="1"/>
+      <line x1="13" y1="4" x2="13" y2="8" stroke="currentColor" stroke-width="0.5"/>
+      <line x1="11" y1="6" x2="15" y2="6" stroke="currentColor" stroke-width="0.5"/>
+    </svg>`
+  }
+  return icons[archetype] || icons['vibe-coder']
 }
 
 let refetchInterval: ReturnType<typeof setInterval> | null = null
@@ -777,6 +890,13 @@ html, body {
   gap: 0.25rem;
 }
 
+.user-row {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  flex-wrap: wrap;
+}
+
 .user-name {
   font-weight: 600;
   color: var(--text);
@@ -786,6 +906,48 @@ html, body {
 .table-row.is-champion .user-name {
   color: var(--accent);
   font-size: 1.1rem;
+}
+
+/* Archetype Badge */
+.archetype-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  padding: 0.2rem 0.5rem;
+  background: color-mix(in srgb, var(--archetype-color) 15%, transparent);
+  border: 1px solid color-mix(in srgb, var(--archetype-color) 40%, transparent);
+  border-radius: 4px;
+  font-size: 0.65rem;
+  font-weight: 500;
+  color: var(--archetype-color);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  cursor: help;
+  transition: all 0.15s ease;
+}
+
+.archetype-badge:hover {
+  background: color-mix(in srgb, var(--archetype-color) 25%, transparent);
+  border-color: var(--archetype-color);
+  transform: translateY(-1px);
+}
+
+.archetype-icon {
+  width: 14px;
+  height: 14px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.archetype-icon svg {
+  width: 100%;
+  height: 100%;
+  filter: drop-shadow(0 0 2px var(--archetype-color));
+}
+
+.archetype-name {
+  white-space: nowrap;
 }
 
 .roast {
