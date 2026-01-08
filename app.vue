@@ -356,6 +356,29 @@
           </div>
         </div>
       </div>
+
+      <!-- Join Invite Modal (from ?join=CODE) -->
+      <div v-if="showJoinInviteModal" class="modal-overlay" @click.self="closeJoinInvite">
+        <div class="modal join-invite-modal">
+          <div class="modal-header">
+            <h3>You're invited!</h3>
+            <button class="modal-close" @click="closeJoinInvite">&times;</button>
+          </div>
+          <div class="modal-body">
+            <div class="invite-team-name">{{ joinInviteTeamName }}</div>
+            <p class="invite-desc">Run this command in Claude Code to join:</p>
+            <div class="invite-cmd" @click="copyInviteCommand">
+              <code>/vibechampion:vibebattle join {{ joinInviteCode }}</code>
+              <span class="copy-hint">{{ copiedInviteCmd ? 'COPIED!' : 'CLICK TO COPY' }}</span>
+            </div>
+            <p class="invite-note">First time? Install the plugin first:</p>
+            <code class="invite-install">claude plugin install vibechampion@pabloprx-vibechampion</code>
+          </div>
+          <div class="modal-footer">
+            <button class="btn-primary" @click="closeJoinInvite">Got it</button>
+          </div>
+        </div>
+      </div>
     </div>
   </div>
 </template>
@@ -494,6 +517,43 @@ const newTeamImageUrl = ref('')
 const newTeamVisibility = ref<Visibility>('both')
 const teamError = ref('')
 const showTeamSettings = ref(false)
+
+// Join invite (from ?join=CODE url)
+const showJoinInviteModal = ref(false)
+const joinInviteCode = ref('')
+const joinInviteTeamName = ref('')
+const copiedInviteCmd = ref(false)
+
+async function showJoinInvite(code: string) {
+  joinInviteCode.value = code
+  // Fetch team name
+  try {
+    const res = await fetch(`/api/teams/${code}`)
+    if (res.ok) {
+      const team = await res.json()
+      joinInviteTeamName.value = team.name
+    } else {
+      joinInviteTeamName.value = code
+    }
+  } catch {
+    joinInviteTeamName.value = code
+  }
+  showJoinInviteModal.value = true
+}
+
+function copyInviteCommand() {
+  navigator.clipboard.writeText(`/vibechampion:vibebattle join ${joinInviteCode.value}`)
+  copiedInviteCmd.value = true
+  setTimeout(() => { copiedInviteCmd.value = false }, 2000)
+}
+
+function closeJoinInvite() {
+  showJoinInviteModal.value = false
+  // Remove ?join from URL
+  const url = new URL(window.location.href)
+  url.searchParams.delete('join')
+  window.history.replaceState({}, '', url.toString())
+}
 
 const periods = [
   { label: 'DAY', value: 'today' },
@@ -897,6 +957,7 @@ function loadFromUrlParams() {
   const urlPeriod = params.get('period')
   const urlSortBy = params.get('sortBy')
   const urlTeam = params.get('team')
+  const urlJoin = params.get('join')
 
   if (urlPeriod && ['today', 'week', 'month', 'all'].includes(urlPeriod)) {
     period.value = urlPeriod
@@ -904,7 +965,10 @@ function loadFromUrlParams() {
   if (urlSortBy && ['vibe_score', 'total_tokens', 'output_tokens', 'total_cost'].includes(urlSortBy)) {
     sortBy.value = urlSortBy as SortMetric
   }
-  if (urlTeam) {
+  if (urlJoin) {
+    // Show join invite modal
+    showJoinInvite(urlJoin)
+  } else if (urlTeam) {
     checkAndHandleTeamFromUrl(urlTeam)
   }
 }
@@ -2275,5 +2339,64 @@ html, body {
   color: var(--text-dim);
   text-transform: uppercase;
   opacity: 0.8;
+}
+
+/* Join Invite Modal */
+.join-invite-modal {
+  max-width: 480px;
+}
+
+.invite-team-name {
+  font-size: 1.5rem;
+  font-weight: 700;
+  color: var(--accent);
+  text-align: center;
+  margin-bottom: 1rem;
+}
+
+.invite-desc {
+  color: var(--text);
+  text-align: center;
+  margin-bottom: 0.75rem;
+  font-size: 0.9rem;
+}
+
+.invite-cmd {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  background: var(--surface);
+  border: 1px solid var(--accent);
+  padding: 0.75rem 1rem;
+  border-radius: 4px;
+  cursor: pointer;
+  margin-bottom: 1.5rem;
+  transition: all 0.2s;
+}
+
+.invite-cmd:hover {
+  background: rgba(0, 255, 136, 0.1);
+}
+
+.invite-cmd code {
+  color: var(--accent);
+  font-size: 0.85rem;
+}
+
+.invite-note {
+  color: var(--text-dim);
+  font-size: 0.75rem;
+  text-align: center;
+  margin-bottom: 0.5rem;
+}
+
+.invite-install {
+  display: block;
+  background: var(--surface);
+  padding: 0.5rem;
+  border-radius: 2px;
+  font-size: 0.7rem;
+  color: var(--text-secondary);
+  text-align: center;
 }
 </style>
