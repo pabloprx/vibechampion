@@ -55,24 +55,19 @@
               <!-- Team Selector -->
               <div class="control-group team-control">
                 <span class="control-label">TEAM</span>
-                <div class="team-selector">
-                  <button
-                    :class="{ active: !currentTeam }"
-                    @click="selectTeam(null)"
+                <div class="team-selector-wrap">
+                  <select
+                    class="team-dropdown"
+                    :value="currentTeam || ''"
+                    @change="selectTeam(($event.target as HTMLSelectElement).value || null)"
                   >
-                    GLOBAL
-                  </button>
-                  <button
-                    v-for="t in myTeams"
-                    :key="t.code"
-                    :class="{ active: currentTeam === t.code }"
-                    @click="selectTeam(t.code)"
-                    :title="t.name"
-                  >
-                    {{ t.name.substring(0, 8) }}
-                  </button>
-                  <button class="add-team-btn" @click="openAddTeamModal" title="Add Team">
-                    +
+                    <option value="">GLOBAL</option>
+                    <option v-for="t in myTeams" :key="t.code" :value="t.code">
+                      {{ t.name }}
+                    </option>
+                  </select>
+                  <button class="team-settings-btn" @click="showTeamSettings = true" title="Manage Teams">
+                    <span class="gear-icon">&#9881;</span>
                   </button>
                 </div>
               </div>
@@ -371,7 +366,16 @@
               <span class="invite-step-num">1</span>
               <div class="invite-step-content">
                 <p class="invite-step-title">Install or Update plugin</p>
-                <code class="invite-install">claude plugin install vibechampion@pabloprx-vibechampion</code>
+                <div class="invite-cmd-pair">
+                  <div class="invite-cmd-item" @click="copyToClipboard('claude plugin install vibechampion@pabloprx-vibechampion', 'install')">
+                    <code>claude plugin install vibechampion@pabloprx-vibechampion</code>
+                    <span class="copy-hint-mini">{{ copiedCmd === 'install' ? 'COPIED' : 'COPY' }}</span>
+                  </div>
+                  <div class="invite-cmd-item" @click="copyToClipboard('claude plugin update vibechampion@pabloprx-vibechampion', 'update')">
+                    <code>claude plugin update vibechampion@pabloprx-vibechampion</code>
+                    <span class="copy-hint-mini">{{ copiedCmd === 'update' ? 'COPIED' : 'COPY' }}</span>
+                  </div>
+                </div>
               </div>
             </div>
 
@@ -535,6 +539,13 @@ const showJoinInviteModal = ref(false)
 const joinInviteCode = ref('')
 const joinInviteTeamName = ref('')
 const copiedInviteCmd = ref(false)
+const copiedCmd = ref<string | null>(null)
+
+function copyToClipboard(text: string, id: string) {
+  navigator.clipboard.writeText(text)
+  copiedCmd.value = id
+  setTimeout(() => { copiedCmd.value = null }, 2000)
+}
 
 async function showJoinInvite(code: string) {
   joinInviteCode.value = code
@@ -1924,51 +1935,63 @@ html, body {
   min-width: 0;
 }
 
-.team-selector {
+.team-selector-wrap {
   display: flex;
+  gap: 0.5rem;
+  align-items: center;
+}
+
+.team-dropdown {
   background: var(--bg-deep);
   border: 1px solid var(--border);
   border-radius: 6px;
-  padding: 3px;
-  gap: 2px;
-  flex-wrap: wrap;
-}
-
-.team-selector button {
-  background: transparent;
-  border: none;
-  color: var(--text-secondary);
-  font-family: inherit;
-  font-size: 0.7rem;
-  font-weight: 500;
-  padding: 0.4rem 0.75rem;
-  border-radius: 4px;
-  cursor: pointer;
-  transition: all 0.15s ease;
-  text-transform: uppercase;
-  letter-spacing: 0.5px;
-  white-space: nowrap;
-}
-
-.team-selector button:hover {
   color: var(--text);
-  background: var(--bg-hover);
+  font-family: inherit;
+  font-size: 0.75rem;
+  font-weight: 500;
+  padding: 0.5rem 2rem 0.5rem 0.75rem;
+  cursor: pointer;
+  appearance: none;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%2300ff88' stroke-width='2'%3E%3Cpath d='M6 9l6 6 6-6'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 0.5rem center;
+  min-width: 120px;
+  max-width: 200px;
 }
 
-.team-selector button.active {
-  color: var(--bg-deep);
-  background: var(--accent);
-  font-weight: 600;
+.team-dropdown:hover {
+  border-color: var(--accent);
 }
 
-.add-team-btn {
-  color: var(--accent) !important;
-  font-size: 1rem !important;
-  padding: 0.3rem 0.6rem !important;
+.team-dropdown:focus {
+  outline: none;
+  border-color: var(--accent);
+  box-shadow: 0 0 0 2px var(--accent-soft);
 }
 
-.add-team-btn:hover {
-  background: var(--accent-soft) !important;
+.team-dropdown option {
+  background: var(--bg);
+  color: var(--text);
+  padding: 0.5rem;
+}
+
+.team-settings-btn {
+  background: var(--bg-deep);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  color: var(--text-secondary);
+  padding: 0.45rem 0.6rem;
+  cursor: pointer;
+  transition: all 0.15s;
+}
+
+.team-settings-btn:hover {
+  border-color: var(--accent);
+  color: var(--accent);
+}
+
+.gear-icon {
+  font-size: 0.9rem;
 }
 
 /* Modal */
@@ -2419,13 +2442,39 @@ html, body {
   font-size: 0.8rem;
 }
 
-.invite-install {
-  display: block;
+.invite-cmd-pair {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.invite-cmd-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
   background: var(--surface);
-  padding: 0.6rem 0.75rem;
+  padding: 0.5rem 0.75rem;
   border-radius: 4px;
-  font-size: 0.75rem;
+  cursor: pointer;
+  transition: all 0.2s;
+  border: 1px solid transparent;
+}
+
+.invite-cmd-item:hover {
+  border-color: var(--accent);
+  background: rgba(0, 255, 136, 0.05);
+}
+
+.invite-cmd-item code {
+  font-size: 0.7rem;
   color: var(--text);
   font-family: 'JetBrains Mono', monospace;
+}
+
+.copy-hint-mini {
+  font-size: 0.6rem;
+  color: var(--accent);
+  text-transform: uppercase;
+  font-weight: 500;
 }
 </style>
