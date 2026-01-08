@@ -30,6 +30,17 @@
         </div>
       </header>
 
+      <!-- Update Alert -->
+      <div v-if="showUpdateAlert" class="update-alert">
+        <div class="update-content">
+          <span class="update-version">v1.2</span>
+          <span class="update-text">Teams feature! Update your plugin:</span>
+          <code class="update-cmd">claude mcp update vibechampion</code>
+          <span class="update-date">Jan 8, 2026</span>
+        </div>
+        <button class="update-dismiss" @click="dismissUpdateAlert">&times;</button>
+      </div>
+
       <main class="main">
         <!-- Rankings - The Star -->
         <section class="rankings-section">
@@ -432,6 +443,20 @@ const copiedIndex = ref<number | null>(null)
 const copiedUpdate = ref(false)
 const hoveredWinner = ref(false)
 
+// Update alert
+const UPDATE_VERSION = 'v1.2'
+const showUpdateAlert = ref(false)
+
+function initUpdateAlert() {
+  const dismissed = localStorage.getItem('vibechampion_update_dismissed')
+  showUpdateAlert.value = dismissed !== UPDATE_VERSION
+}
+
+function dismissUpdateAlert() {
+  showUpdateAlert.value = false
+  localStorage.setItem('vibechampion_update_dismissed', UPDATE_VERSION)
+}
+
 // Team state
 const currentTeam = ref<string | null>(null)
 const myTeams = ref<MyTeam[]>([])
@@ -744,6 +769,7 @@ function handleVisibilityChange() {
 }
 
 onMounted(() => {
+  initUpdateAlert()
   loadTeamsFromStorage()
   loadFromUrlParams()
   fetchLeaderboard()
@@ -954,7 +980,75 @@ html, body {
   align-items: center;
   padding-bottom: 2rem;
   border-bottom: 1px solid var(--border);
-  margin-bottom: 2rem;
+  margin-bottom: 1rem;
+}
+
+.update-alert {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  background: linear-gradient(90deg, rgba(0, 255, 136, 0.1), rgba(0, 255, 136, 0.05));
+  border: 1px solid var(--accent);
+  border-radius: 4px;
+  padding: 0.75rem 1rem;
+  margin-bottom: 1.5rem;
+  animation: pulse-border 2s ease-in-out infinite;
+}
+
+@keyframes pulse-border {
+  0%, 100% { border-color: var(--accent); box-shadow: 0 0 10px rgba(0, 255, 136, 0.2); }
+  50% { border-color: var(--accent-bright); box-shadow: 0 0 20px rgba(0, 255, 136, 0.4); }
+}
+
+.update-content {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  flex-wrap: wrap;
+}
+
+.update-version {
+  background: var(--accent);
+  color: var(--bg);
+  font-weight: 700;
+  padding: 0.25rem 0.5rem;
+  border-radius: 2px;
+  font-size: 0.75rem;
+  text-transform: uppercase;
+}
+
+.update-text {
+  color: var(--text);
+  font-size: 0.875rem;
+}
+
+.update-cmd {
+  background: var(--surface);
+  color: var(--accent);
+  padding: 0.25rem 0.5rem;
+  border-radius: 2px;
+  font-family: inherit;
+  font-size: 0.8rem;
+}
+
+.update-date {
+  color: var(--text-dim);
+  font-size: 0.75rem;
+}
+
+.update-dismiss {
+  background: transparent;
+  border: none;
+  color: var(--text-dim);
+  font-size: 1.25rem;
+  cursor: pointer;
+  padding: 0.25rem;
+  line-height: 1;
+  transition: color 0.2s;
+}
+
+.update-dismiss:hover {
+  color: var(--text);
 }
 
 .logo {
