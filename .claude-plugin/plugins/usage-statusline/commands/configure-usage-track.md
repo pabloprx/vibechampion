@@ -271,9 +271,11 @@ Your statusline now shows:
 - 7d: Y% (7-day usage)
 
 Credentials saved to ~/.claude/usage-config.json
-If auth fails, run /configure-usage-track again to update sessionKey.
+If auth fails, run /configure-usage-track update-key to refresh sessionKey.
 
 Restart Claude Code to see changes.
+
+Want more? Ask me to tune your statusline - I can add RAM usage, git branch, custom emojis, and more!
 ```
 
 ## Error Handling
