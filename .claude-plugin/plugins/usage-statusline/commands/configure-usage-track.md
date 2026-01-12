@@ -31,16 +31,15 @@ Read `~/.claude/settings.json` and check if `statusLine` is configured.
 
 Use AskUserQuestion with ONE call containing both questions:
 
-**Question 1: "What's your Claude.ai organization ID?"**
+**Question 1: "What's your Claude.ai organization ID? (Go to https://claude.ai/settings/account - it's listed there, easy to copy)"**
 - Header: "Org ID"
 - Options:
-  - "I'll paste it" - user provides UUID from claude.ai URL
-- Instructions to find it: Go to claude.ai/settings, look at URL - it contains the org ID
+  - "I'll paste it" - user copies UUID from settings page
 
-**Question 2: "What's your sessionKey cookie?"**
+**Question 2: "What's your sessionKey cookie? (DevTools > Application > Cookies > claude.ai > sessionKey)"**
 - Header: "Session Key"
 - Options:
-  - "I'll paste it" - user provides from DevTools > Application > Cookies > sessionKey
+  - "I'll paste it" - user copies from browser DevTools
 
 After user provides values, validate by testing the API:
 ```bash
