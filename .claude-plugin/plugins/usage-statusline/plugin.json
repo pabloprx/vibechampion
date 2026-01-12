@@ -1,0 +1,6 @@
+{
+  "name": "usage-statusline",
+  "version": "1.0.0",
+  "description": "Track Claude platform usage (5h/7d limits) in your statusline",
+  "commands": ["./commands/configure-usage-track.md"]
+}

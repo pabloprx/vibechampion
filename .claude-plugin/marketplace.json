@@ -4,11 +4,15 @@
     "name": "pabloprx",
     "url": "https://github.com/pabloprx"
   },
-  "description": "VibeBattle - Track and compare Claude Code usage with your team",
+  "description": "VibeBattle and Claude usage tools",
   "plugins": [
     {
       "name": "vibechampion",
       "source": "./.claude-plugin/plugins/vibechampion"
+    },
+    {
+      "name": "usage-statusline",
+      "source": "./.claude-plugin/plugins/usage-statusline"
     }
   ]
 }
