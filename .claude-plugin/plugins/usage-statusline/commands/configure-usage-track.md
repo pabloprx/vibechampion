@@ -29,17 +29,21 @@ Read `~/.claude/settings.json` and check if `statusLine` is configured.
 
 ### 2. Get credentials
 
-Use AskUserQuestion with ONE call containing both questions. Users paste directly via "Other" input:
+Use AskUserQuestion with ONE call containing both questions. Tell user to paste in the text field:
 
-**Question 1: "Paste your Organization ID (from https://claude.ai/settings/account)"**
+**Question 1: "Organization ID? (type/paste in text field - find at https://claude.ai/settings/account)"**
 - Header: "Org ID"
 - Options:
-  - "Open settings page" - just a hint, user will use Other to paste the UUID
+  - Label: "Where do I find this?", Description: "Go to claude.ai/settings/account and copy the UUID"
+  - Label: "Skip", Description: "Cancel setup"
 
-**Question 2: "Paste your sessionKey cookie (DevTools > Application > Cookies > claude.ai > sessionKey)"**
+**Question 2: "sessionKey cookie? (type/paste in text field)"**
 - Header: "Session Key"
 - Options:
-  - "Open DevTools" - just a hint, user will use Other to paste the key
+  - Label: "Where do I find this?", Description: "DevTools (F12) > Application > Cookies > claude.ai > sessionKey"
+  - Label: "Skip", Description: "Cancel setup"
+
+IMPORTANT: The user will paste their values in the "Other" text field. If they select "Skip", abort the setup.
 
 After user provides values, validate by testing the API:
 ```bash
